@@ -1,0 +1,16 @@
+export const WORLD_SIZE=144;
+export const INTERESTS=['Gaming','Music','Travel','Movies','Art','Books','Cooking','Fitness','Nature','Photography','Technology','Pets'] as const;
+export const SHIRTS=['#8b5cf6','#ec4899','#0d9488','#2563eb','#ea580c','#facc15'] as const;
+export const SKINS=['#f3c9a6','#dba77d','#ac724f','#754832','#4b3025'] as const;
+export const HAIRS=['#30232a','#80502f','#d7ad68','#bd5a43'] as const;
+export const MATERIALS=[{id:'grass',name:'Grass',color:'#7fb56b'},{id:'wood',name:'Wood',color:'#b78050'},{id:'stone',name:'Stone',color:'#a5a6b4'},{id:'rose',name:'Rose',color:'#e78eab'},{id:'lavender',name:'Lavender',color:'#ad91dc'},{id:'sand',name:'Sand',color:'#e8cea0'}] as const;
+export type Material=typeof MATERIALS[number]['id'];
+export type Avatar={shirt:string;skin:string;hair:string};
+export type WorldPlayer={vehicle?:boolean;id:string;nickname:string;avatar:Avatar;x:number;z:number;direction:number;emote:string;emoteAt:number;updatedAt:number};
+export type WorldBlock={x:number;y:number;z:number;material:Material};
+export type WorldMessage={id:string;playerId:string;nickname:string;text:string;createdAt:number};
+export type WorldSnapshot={invitations?:{id:string;fromId:string;nickname:string}[];theme?:'classic'|'wedding'|'winter'|'romantic';session:string;roomId:string|null;mode:'couple'|'discover'|'city';status:'waiting'|'active'|'ended';selfId:string;players:WorldPlayer[];blocks:WorldBlock[];messages:WorldMessage[];sharedInterests:string[];serverTime:number;};
+export const defaultAvatar:Avatar={shirt:SHIRTS[0],skin:SKINS[1],hair:HAIRS[0]};
+export const interestMask=(interests:string[])=>interests.reduce((mask,i)=>{const index=INTERESTS.indexOf(i as typeof INTERESTS[number]);return index<0?mask:mask|(1<<index);},0);
+export const blockKey=(b:{x:number;y:number;z:number})=>`${b.x}:${b.y}:${b.z}`;
+export const isSpawn=(x:number,z:number)=>x>=8&&x<=11&&z>=8&&z<=11;

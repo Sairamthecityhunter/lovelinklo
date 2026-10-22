@@ -1,0 +1,22 @@
+import * as THREE from 'three';
+
+// Draw the same 3D scene with a painter's algorithm when WebGL is unavailable.
+// This keeps the world interactive on restricted browsers without a separate game implementation.
+export class WorldSoftwareRenderer{
+ domElement=document.createElement('canvas');shadowMap={enabled:false,type:0};outputColorSpace='';private ctx=this.domElement.getContext('2d')!;private width=1;private height=1;private background='#dcecf5';private frame=0;private stopped=true;
+ setPixelRatio(_:number){}setClearColor(c:string){this.background=c;}
+ setSize(w:number,h:number,_?:boolean){this.width=Math.max(1,Math.round(w));this.height=Math.max(1,Math.round(h));this.domElement.width=this.width;this.domElement.height=this.height;}
+ setAnimationLoop(callback:((time:number)=>void)|null){this.stopped=!callback;cancelAnimationFrame(this.frame);if(!callback)return;let previous=0;const tick=(time:number)=>{if(this.stopped)return;if(time-previous>31){previous=time;callback(time);}this.frame=requestAnimationFrame(tick);};this.frame=requestAnimationFrame(tick);}
+ render(scene:THREE.Scene,camera:THREE.Camera){const ctx=this.ctx,w=this.width,h=this.height;ctx.fillStyle=this.background;ctx.fillRect(0,0,w,h);scene.updateMatrixWorld();camera.updateMatrixWorld();
+  const direction=new THREE.Vector3();camera.getWorldDirection(direction);
+  const corners=[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]].map(v=>new THREE.Vector3(...v as [number,number,number]));
+  const faceIndices=[[4,5,6,7],[1,2,6,5],[3,7,6,2],[0,4,7,3],[1,0,3,2],[0,1,5,4]];const normals=[[0,0,1],[1,0,0],[0,1,0],[-1,0,0],[0,0,-1],[0,-1,0]].map(v=>new THREE.Vector3(...v as [number,number,number]));
+  const faces:{points:THREE.Vector3[];depth:number;color:string;layer:number}[]=[],sprites:THREE.Sprite[]=[];const light=new THREE.Vector3(-.4,1,.6).normalize();
+  const cube=(matrix:THREE.Matrix4,color:THREE.Color,layer:number)=>{const vertices=corners.map(c=>c.clone().applyMatrix4(matrix).project(camera));if(vertices.every(v=>v.x<-1.2)||vertices.every(v=>v.x>1.2)||vertices.every(v=>v.y<-1.2)||vertices.every(v=>v.y>1.2))return;for(let i=0;i<6;i++){const normal=normals[i].clone().transformDirection(matrix);if(normal.dot(direction)>=0)continue;const points=faceIndices[i].map(j=>vertices[j]);const shade=.76+Math.max(0,normal.dot(light))*.24;const c=color.clone().multiplyScalar(shade);faces.push({points,depth:points.reduce((sum,p)=>sum+p.z,0)/4,color:'#'+c.getHexString(),layer});}};
+  scene.traverse(object=>{if(!object.visible)return;if(object instanceof THREE.Sprite){sprites.push(object);return;}if(!(object instanceof THREE.Mesh)||object.geometry.type!=='BoxGeometry')return;const mat=(Array.isArray(object.material)?object.material[0]:object.material) as THREE.MeshStandardMaterial;if(object instanceof THREE.InstancedMesh){const local=new THREE.Matrix4(),color=new THREE.Color();for(let i=0;i<object.count;i++){object.getMatrixAt(i,local);object.getColorAt(i,color);cube(new THREE.Matrix4().multiplyMatrices(object.matrixWorld,local),color,1);}}else{const p=(object.geometry as THREE.BoxGeometry).parameters;const local=new THREE.Matrix4().makeScale(p.width,p.height,p.depth);cube(new THREE.Matrix4().multiplyMatrices(object.matrixWorld,local),mat.color,object.scale.x>=20?0:2);}});
+  faces.sort((a,b)=>a.layer-b.layer||b.depth-a.depth);for(const face of faces){ctx.beginPath();face.points.forEach((p,i)=>{const x=(p.x+1)*w/2,y=(1-p.y)*h/2;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.closePath();ctx.fillStyle=face.color;ctx.fill();}
+  scene.traverse(object=>{if(!object.visible||!(object instanceof THREE.LineSegments))return;const pos=object.geometry.getAttribute('position');ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.beginPath();for(let i=0;i<pos.count;i+=2){const a=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(object.matrixWorld).project(camera),b=new THREE.Vector3().fromBufferAttribute(pos,i+1).applyMatrix4(object.matrixWorld).project(camera);ctx.moveTo((a.x+1)*w/2,(1-a.y)*h/2);ctx.lineTo((b.x+1)*w/2,(1-b.y)*h/2);}ctx.stroke();});
+  for(const sprite of sprites){const p=new THREE.Vector3().setFromMatrixPosition(sprite.matrixWorld).project(camera);const image=sprite.material.map?.image;if(!image||p.z>1||p.z<-1)continue;const sw=sprite.scale.x*camera.projectionMatrix.elements[0]*w/2,sh=sprite.scale.y*camera.projectionMatrix.elements[5]*h/2;ctx.drawImage(image as CanvasImageSource,(p.x+1)*w/2-sw/2,(1-p.y)*h/2-sh/2,sw,sh);}
+ }
+ dispose(){this.setAnimationLoop(null);}
+}

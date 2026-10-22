@@ -1,0 +1,3 @@
+import {db,ApiError} from './server';
+export const catalogQuery="SELECT p.id,p.owner_id,p.country,p.currency,p.data_json,a.data_json AS application_json FROM seller_records p JOIN seller_records a ON a.owner_id=p.owner_id AND a.kind='application' AND a.status='reviewed' AND a.country=p.country WHERE p.kind='product' AND p.status='reviewed' AND json_extract(p.data_json,'$.catalogConsent')=1";
+export async function publicProduct(id:string){const r=await db().prepare(catalogQuery+' AND p.id=?').bind(id).first<any>();if(!r)throw new ApiError(404,'This catalog preview is unavailable.');return r;}

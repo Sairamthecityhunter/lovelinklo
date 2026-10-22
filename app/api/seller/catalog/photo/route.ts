@@ -1,0 +1,4 @@
+import {db,storage,failure,ApiError} from '@/lib/server';
+import {publicProduct} from '@/lib/seller-catalog';
+export const dynamic='force-dynamic';
+export async function GET(request:Request){try{const id=new URL(request.url).searchParams.get('recordId');if(!id||id.length>200)throw new ApiError(400,'Choose a product.');const row=await publicProduct(id),path=JSON.parse(row.data_json).image;const media=await db().prepare('SELECT object_key,mime FROM media WHERE id=? AND owner_id=?').bind(path?.split('/').pop()||'',row.owner_id).first<any>();if(!media?.mime.startsWith('image/'))throw new ApiError(404,'Product photo unavailable.');const file=await storage().get(media.object_key);if(!file)throw new ApiError(404,'Product photo unavailable.');return new Response(file.body,{headers:{'Content-Type':media.mime,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});}catch(e){return failure(e);}}
