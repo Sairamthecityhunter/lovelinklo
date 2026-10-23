@@ -14,6 +14,8 @@ export async function ensureLocalSchema(){
   if(!extras)throw new Error('Couple tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
   const safety=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'partner_blocks'").first();
   if(!safety)throw new Error('Safety tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const push=await database.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'push_subscriptions' AND column_name = 'endpoint'").first();
+  if(!push)throw new Error('Push tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
  })().catch(e=>{ready=null;throw e;});
  await ready;
 }

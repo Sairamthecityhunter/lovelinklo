@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {publicAppUrl} from '@/lib/app-url';
 import {formatInviteCode,normalizeInviteCode,randomInviteCode,sha256Hex} from '@/lib/invite-code';
 import {assertRateLimit,clientIp} from '@/lib/rate-limit';
+import {defaultPartnerCloseness} from '@/lib/closeness';
 import {pairingBlocked} from '@/lib/partner-safety';
 import {ApiError,db,ensureUser,failure,guard,jsonBody,response,tables} from '@/lib/server';
 
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
       claimed('UPDATE daily_answers SET couple_id = ? WHERE user_id = ?', [row.couple_id, ctx.userId]),
     ]);
     if (!results[0].meta.changes) throw new ApiError(409, 'This invitation has already been accepted or the couple space is full.');
+    await defaultPartnerCloseness(ctx.userId, row.inviter_id);
     return response({connected: true});
   } catch (e) {
     return failure(e);

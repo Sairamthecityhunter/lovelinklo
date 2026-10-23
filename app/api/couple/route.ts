@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {isCheckinMood,promptForDay,utcDay} from '@/lib/daily-prompt';
+import {notifyNoteRecipients} from '@/lib/notify-notes';
 import {assertRateLimit} from '@/lib/rate-limit';
 import {ApiError,db,ensureUser,failure,guard,jsonBody,response} from '@/lib/server';
 
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
       await database.prepare(
         'INSERT INTO couple_notes (id, couple_id, owner_id, body, created_at) VALUES (?, ?, ?, ?, ?)',
       ).bind(id, ctx.coupleId, ctx.userId, parsed.body, createdAt).run();
+      await notifyNoteRecipients(ctx, ctx.profile.myName).catch(() => {});
       return response({id, ownerId: ctx.userId, body: parsed.body, createdAt, mine: true});
     }
     if (body.op === 'delete-note') {

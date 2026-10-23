@@ -1,5 +1,6 @@
 import type {Profile} from '@/lib/love-types';
 import {ApiError,db,tables} from '@/lib/server';
+import {deliverPush} from '@/lib/web-push';
 
 export type SafetyTarget = {userId: string; name: string};
 
@@ -44,15 +45,35 @@ export async function unlinkFromPartner(ctx: {userId: string; coupleId: string})
   return nextCoupleId;
 }
 
+export async function clearPairNotifications(a: string, b: string) {
+  const database = db();
+  await database.batch([
+    database.prepare(
+      `DELETE FROM sent_reminders WHERE special_day_id IN (
+         SELECT id FROM special_days WHERE (owner_user_id = ? AND person_user_id = ?) OR (owner_user_id = ? AND person_user_id = ?)
+       )`,
+    ).bind(a, b, b, a),
+    database.prepare('DELETE FROM special_days WHERE (owner_user_id = ? AND person_user_id = ?) OR (owner_user_id = ? AND person_user_id = ?)').bind(a, b, b, a),
+    database.prepare('DELETE FROM closeness WHERE (owner_user_id = ? AND target_user_id = ?) OR (owner_user_id = ? AND target_user_id = ?)').bind(a, b, b, a),
+  ]);
+}
+
 export async function blockPartner(ctx: {userId: string; coupleId: string; profile: Profile}) {
   const partner = await currentPartner(ctx);
   if (!partner) throw new ApiError(403, 'You can only block someone you are currently linked with.');
   if (await pairingBlocked(ctx.userId, partner.userId)) throw new ApiError(409, 'This person is already blocked.');
   const now = new Date().toISOString();
+  await clearPairNotifications(ctx.userId, partner.userId);
   await db().prepare(
     'INSERT INTO partner_blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)',
   ).bind(ctx.userId, partner.userId, now).run();
   await unlinkFromPartner(ctx);
+  await deliverPush(ctx.userId, {
+    kind: 'block-confirmed',
+    title: 'Block confirmed',
+    body: 'They are unlinked. They were not notified.',
+    url: '/us',
+  });
   return partner;
 }
 

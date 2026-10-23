@@ -7,6 +7,7 @@ import {REPORT_REASONS} from '@/lib/report-reasons';
 import {countdown,dateLabel,nextEventDate} from '@/lib/love-time';
 import {CHECKIN_MOODS} from '@/lib/daily-prompt';
 import type {Goal,LoveEvent,LoveState,Memory,View} from '@/lib/love-types';
+import {PartnerNotifySettings,SpecialDaysCard} from './love-notify';
 import {MediaView} from './love-extras';
 
 function SectionTitle({title,sub,action}:{title:string;sub?:string;action?:ReactNode}){
@@ -423,6 +424,17 @@ export function OurSpaceView({
           )) : <p className="help-text">Add a dream on Plans. Leave it shared so it appears here for both of you.</p>}
         </section>
       </div>
+      <PartnerNotifySettings
+        signedIn={signedIn}
+        partnerName={couple?.partner?.name || state.profile.partnerName}
+        partnerUserId={couple?.partner?.userId || null}
+        connected={connected}
+      />
+      <SpecialDaysCard
+        signedIn={signedIn}
+        partnerName={couple?.partner?.name || state.profile.partnerName}
+        partnerUserId={couple?.partner?.userId || null}
+      />
       <PartnerSafetyCard
         partnerName={couple?.partner?.name || state.profile.partnerName}
         canBlock={safety?.canBlock ?? connected}

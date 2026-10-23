@@ -22,6 +22,13 @@
       "when": 1792791633061,
       "tag": "0002_partner_safety",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792796537172,
+      "tag": "0003_push_reminders",
+      "breakpoints": true
     }
   ]
 }

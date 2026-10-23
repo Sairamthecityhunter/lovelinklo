@@ -97,14 +97,18 @@ Set these on the `lovelinklos` Vercel project (Production and Preview):
 | `APP_URL` | Public origin for invite links, password-reset emails, sitemap, and Open Graph. Example: `https://lovelinklos.vercel.app`. Optional locally. |
 | `RESEND_API_KEY` | Optional. With `EMAIL_FROM`, sends password-reset email. Forgot-password still works without it, but no email is delivered. |
 | `EMAIL_FROM` | Optional verified sender for Resend, e.g. `LoveLink <hello@yourdomain.com>`. |
+| `VAPID_PUBLIC_KEY` | Optional. Web Push public key. If any VAPID value is unset, LoveLink skips sending and does not error. |
+| `VAPID_PRIVATE_KEY` | Optional. Web Push private key. |
+| `VAPID_SUBJECT` | Optional. `mailto:` or `https:` contact used as the VAPID subject. |
+| `CRON_SECRET` | Protects `GET`/`POST` `/api/cron/reminders`. Vercel Cron sends it as `Authorization: Bearer`. |
 
-Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unchanged. After provisioning the database, apply schema with `pnpm db:migrate` (or `npm run db:migrate`) using that `DATABASE_URL`. Vercel does not apply migrations automatically.
+Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unchanged. Web Push uses `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` when set; if any are missing, LoveLink skips sending and does not error. The hourly special-day job at `/api/cron/reminders` requires `CRON_SECRET`. After provisioning the database, apply schema with `pnpm db:migrate` (or `npm run db:migrate`) using that `DATABASE_URL`. Vercel does not apply migrations automatically.
 
 ### Deploying `lovelinklos` from this branch
 
 1. In the Vercel project **lovelinklos**, set Git to deploy this branch (not `main`).
 2. Add `DATABASE_URL`, `AUTH_SECRET`, and `APP_URL`. Optionally `RESEND_API_KEY` and `EMAIL_FROM` for password-reset email.
-3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`, `0001`, and `0002`).
+3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`, `0001`, `0002`, and `0003`).
 4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
 5. Confirm `/register`, `/us` invite+accept, and creating a wish pin survive a reload.
 
@@ -124,7 +128,7 @@ pnpm dev
 
 - `node --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, and D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases).
 - `pnpm exec tsc --noEmit`: typed application and route checks.
-- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, and partner block/report (unlink, rejected re-pair both ways, flagged report). Test identities are synthetic.
+- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, partner block/report (unlink, rejected re-pair both ways, flagged report), and push/closeness/special-day reminders (subscribe/unsubscribe, note targeting, reminder timing, cron dedupe and auth, quiet block cleanup). Test identities are synthetic.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
 
 Two structured browser tools are included: `list_love_pins` (read only) and `start_love_pin` (opens the editor without saving). Inputs are validated and outputs use the same visible state as the interface.
