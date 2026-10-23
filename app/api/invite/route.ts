@@ -1,10 +1,116 @@
-import {ApiError,db,ensureUser,identity,guard,jsonBody,response,failure,tables} from '@/lib/server';
-export const dynamic='force-dynamic';
-async function hash(v:string){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)))).map(b=>b.toString(16).padStart(2,'0')).join('');}
-export async function POST(request:Request){try{guard(request);const body=await jsonBody(request,2000);const ctx=await ensureUser();const database=db();if(body.op==='create'){const members=await database.prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n:number}>();if((members?.n||0)>=2)throw new ApiError(400,'Your couple space already has two people.');const token=crypto.randomUUID()+crypto.randomUUID();await database.batch([database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(ctx.coupleId),database.prepare('INSERT INTO partner_invitations (id,couple_id,inviter_id,token_hash,expires_at,created_at) VALUES (?,?,?,?,?,?)').bind(crypto.randomUUID(),ctx.coupleId,ctx.userId,await hash(token),new Date(Date.now()+7*86400000).toISOString(),new Date().toISOString())]);return response({token,expiresInDays:7});}
- if(body.op!=='accept'||typeof body.token!=='string'||body.token.length>100)throw new ApiError(400,'This invitation is invalid.');const row=await database.prepare('SELECT * FROM partner_invitations WHERE token_hash = ? AND accepted_by IS NULL AND expires_at > ?').bind(await hash(body.token),new Date().toISOString()).first<any>();if(!row)throw new ApiError(404,'This invitation has expired or was already used. Ask for a fresh link.');if(row.inviter_id===ctx.userId)throw new ApiError(400,'This invitation is for your partner. Share the link with them.');const ownMembers=await database.prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n:number}>();if((ownMembers?.n||0)>1)throw new ApiError(409,'Disconnect your current couple space before joining another.');const partner=await database.prepare('SELECT profile_json FROM users WHERE id = ?').bind(row.inviter_id).first<{profile_json:string}>();if(!partner)throw new ApiError(404,'This invitation is no longer available.');const p=JSON.parse(partner.profile_json);const profile={...ctx.profile,myName:p.partnerName,partnerName:p.myName,myTimezone:p.partnerTimezone,partnerTimezone:p.myTimezone,togetherSince:p.togetherSince,sample:false};
- // The claim and membership changes are one atomic D1 batch. The count guard prevents a third member.
- const claim=database.prepare('UPDATE partner_invitations SET accepted_by = ? WHERE id = ? AND accepted_by IS NULL AND expires_at > ? AND (SELECT COUNT(*) FROM users WHERE couple_id = ?) < 2').bind(ctx.userId,row.id,new Date().toISOString(),row.couple_id);
- const change=database.prepare('UPDATE users SET couple_id = ?, profile_json = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)').bind(row.couple_id,JSON.stringify(profile),new Date().toISOString(),ctx.userId,row.id,ctx.userId);
- const move=Object.values(tables).map(t=>database.prepare(`UPDATE ${t} SET couple_id = ? WHERE owner_id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)`).bind(row.couple_id,ctx.userId,row.id,ctx.userId));
- const results=await database.batch([claim,change,...move,database.prepare('DELETE FROM world_sessions WHERE user_id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)').bind(ctx.userId,row.id,ctx.userId),database.prepare('UPDATE media SET couple_id = ? WHERE owner_id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)').bind(row.couple_id,ctx.userId,row.id,ctx.userId)]);if(!results[0].meta.changes)throw new ApiError(409,'This invitation has already been accepted or the couple space is full.');return response({connected:true});}catch(e){return failure(e);}}
+import {z} from 'zod';
+import {publicAppUrl} from '@/lib/app-url';
+import {formatInviteCode,normalizeInviteCode,randomInviteCode,sha256Hex} from '@/lib/invite-code';
+import {assertRateLimit,clientIp} from '@/lib/rate-limit';
+import {ApiError,db,ensureUser,failure,guard,jsonBody,response,tables} from '@/lib/server';
+
+export const dynamic = 'force-dynamic';
+
+const createSchema = z.object({op: z.literal('create')}).strict();
+const cancelSchema = z.object({op: z.literal('cancel')}).strict();
+const acceptSchema = z.object({
+  op: z.literal('accept'),
+  token: z.string().trim().max(120).optional(),
+  code: z.string().trim().max(20).optional(),
+}).strict();
+
+export async function GET() {
+  try {
+    const ctx = await ensureUser();
+    const members = await db().prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n: number}>();
+    const pending = await db().prepare(
+      'SELECT expires_at FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+    ).bind(ctx.coupleId, new Date().toISOString()).first<{expires_at: string}>();
+    return response({
+      connected: (members?.n || 0) > 1,
+      pending: !!pending,
+      expiresAt: pending?.expires_at || null,
+    });
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    guard(request);
+    const ctx = await ensureUser();
+    const body = await jsonBody(request, 2000);
+    const database = db();
+    if (body.op === 'create') {
+      createSchema.parse(body);
+      await assertRateLimit('invite:create:' + ctx.userId, 8, 60 * 60 * 1000);
+      const members = await database.prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n: number}>();
+      if ((members?.n || 0) >= 2) throw new ApiError(400, 'Your couple space already has two people.');
+      const token = crypto.randomUUID() + crypto.randomUUID();
+      const code = randomInviteCode();
+      const now = new Date().toISOString();
+      await database.batch([
+        database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(ctx.coupleId),
+        database.prepare(
+          'INSERT INTO partner_invitations (id,couple_id,inviter_id,token_hash,code_hash,expires_at,created_at) VALUES (?,?,?,?,?,?,?)',
+        ).bind(crypto.randomUUID(), ctx.coupleId, ctx.userId, await sha256Hex(token), await sha256Hex(code), new Date(Date.now() + 7 * 86400000).toISOString(), now),
+      ]);
+      return response({
+        token,
+        code: formatInviteCode(code),
+        expiresInDays: 7,
+        url: `${publicAppUrl()}/invite?token=${encodeURIComponent(token)}`,
+      });
+    }
+    if (body.op === 'cancel') {
+      cancelSchema.parse(body);
+      await database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(ctx.coupleId).run();
+      return response({cancelled: true});
+    }
+    const parsed = acceptSchema.parse(body);
+    await assertRateLimit('invite:accept:' + (ctx.userId + ':' + clientIp(request)), 10, 60 * 60 * 1000);
+    const raw = (parsed.token || parsed.code || '').trim();
+    if (!raw) throw new ApiError(400, 'This invitation is invalid.');
+    const tokenHash = await sha256Hex(raw);
+    const codeHash = await sha256Hex(normalizeInviteCode(raw));
+    const row = await database.prepare(
+      'SELECT * FROM partner_invitations WHERE accepted_by IS NULL AND expires_at > ? AND (token_hash = ? OR code_hash = ?)',
+    ).bind(new Date().toISOString(), tokenHash, codeHash).first<any>();
+    if (!row) throw new ApiError(404, 'This invitation has expired or was already used. Ask for a fresh link or code.');
+    if (row.inviter_id === ctx.userId) throw new ApiError(400, 'This invitation is for your partner. Share the link or code with them.');
+    const ownMembers = await database.prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n: number}>();
+    if ((ownMembers?.n || 0) > 1) throw new ApiError(409, 'Disconnect your current couple space before joining another.');
+    const partner = await database.prepare('SELECT profile_json FROM users WHERE id = ?').bind(row.inviter_id).first<{profile_json: string}>();
+    if (!partner) throw new ApiError(404, 'This invitation is no longer available.');
+    const p = JSON.parse(partner.profile_json);
+    const profile = {
+      ...ctx.profile,
+      myName: p.partnerName,
+      partnerName: p.myName,
+      myTimezone: p.partnerTimezone,
+      partnerTimezone: p.myTimezone,
+      togetherSince: p.togetherSince,
+      sample: false,
+    };
+    const claim = database.prepare(
+      'UPDATE partner_invitations SET accepted_by = ? WHERE id = ? AND accepted_by IS NULL AND expires_at > ? AND (SELECT COUNT(*) FROM users WHERE couple_id = ?) < 2',
+    ).bind(ctx.userId, row.id, new Date().toISOString(), row.couple_id);
+    const change = database.prepare(
+      'UPDATE users SET couple_id = ?, profile_json = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)',
+    ).bind(row.couple_id, JSON.stringify(profile), new Date().toISOString(), ctx.userId, row.id, ctx.userId);
+    const claimed = (idSql: string, params: unknown[]) =>
+      database.prepare(`${idSql} AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)`).bind(...params, row.id, ctx.userId);
+    const move = Object.values(tables).map((t) =>
+      claimed(`UPDATE ${t} SET couple_id = ? WHERE owner_id = ?`, [row.couple_id, ctx.userId]),
+    );
+    const results = await database.batch([
+      claim,
+      change,
+      ...move,
+      claimed('DELETE FROM world_sessions WHERE user_id = ?', [ctx.userId]),
+      claimed('UPDATE media SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
+      claimed('UPDATE couple_notes SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
+      claimed('UPDATE daily_answers SET couple_id = ? WHERE user_id = ?', [row.couple_id, ctx.userId]),
+    ]);
+    if (!results[0].meta.changes) throw new ApiError(409, 'This invitation has already been accepted or the couple space is full.');
+    return response({connected: true});
+  } catch (e) {
+    return failure(e);
+  }
+}

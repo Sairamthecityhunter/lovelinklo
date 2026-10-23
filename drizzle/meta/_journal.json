@@ -8,6 +8,13 @@
       "when": 1792755566706,
       "tag": "0000_brief_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792759232427,
+      "tag": "0001_silly_energizer",
+      "breakpoints": true
     }
   ]
 }

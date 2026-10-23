@@ -52,7 +52,9 @@ export function AuthForm({mode,nextPath='/'}:{mode:'login'|'register';nextPath?:
      <label>Password<input required type="password" minLength={8} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)} autoComplete={mode==='login'?'current-password':'new-password'} placeholder="At least 8 characters"/></label>
      {error&&<p className="auth-error" role="alert">{error}</p>}
      <button className="primary-button" disabled={busy}>{busy?(mode==='login'?'Signing in…':'Creating account…'):(mode==='login'?'Sign in':'Create account')}</button>
+     {mode==='login'&&<p className="auth-switch"><Link href="/forgot">Forgot your password?</Link></p>}
      <p className="auth-switch">{mode==='login'?<>New here? <Link href="/register">Create an account</Link></>:<>Already have an account? <Link href="/login">Sign in</Link></>}</p>
+     <p className="auth-switch">By continuing you agree to the <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy policy</Link>.</p>
     </form>
    </main>
   </div>

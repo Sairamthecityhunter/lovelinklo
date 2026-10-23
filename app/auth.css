@@ -93,3 +93,18 @@ body .landing-primary:hover{filter:none;background:#f3e8ee;transform:translateY(
 @media(prefers-reduced-motion:reduce){
  .landing-hero-media,.landing-nav,.landing-hero-copy,.landing-moment img{animation:none!important;transition:none!important;transform:none!important}
 }
+
+.landing-footer-nav{display:flex;flex-wrap:wrap;gap:14px 18px}
+.legal-shell{min-height:100vh;display:flex;flex-direction:column;background:var(--background);color:var(--foreground)}
+.legal-nav{display:flex;align-items:center;justify-content:space-between;padding:18px clamp(16px,4vw,48px)}
+.legal-nav .brand-logo-wordmark{height:56px;max-width:280px}
+.legal-nav-signin{color:var(--foreground)!important;border-color:var(--border)!important;background:var(--card)!important}
+.legal-article{flex:1;max-width:720px;margin:0 auto;padding:12px clamp(18px,4vw,32px) 64px}
+.legal-article h1{font-family:var(--font-display);font-size:clamp(2rem,4vw,2.8rem);letter-spacing:-.03em;margin:8px 0 10px}
+.legal-article h2{font-size:1.25rem;margin:28px 0 8px}
+.legal-article p,.legal-article li{line-height:1.7;color:var(--muted-foreground)}
+.legal-updated{font-size:13px;margin-bottom:24px}
+.error-article .button-row{margin-top:22px;display:flex;flex-wrap:wrap;gap:12px}
+@media(max-width:640px){
+ .landing-footer{flex-direction:column;align-items:flex-start;gap:12px}
+}

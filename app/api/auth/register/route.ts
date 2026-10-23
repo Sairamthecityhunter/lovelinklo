@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {seedState} from '@/lib/love-data';
 import type {Collection,Pin,Profile} from '@/lib/love-types';
 import {ensureAuthTables} from '@/lib/migrate-local';
+import {assertRateLimit,clientIp} from '@/lib/rate-limit';
 import {ApiError,db,failure,guard,insertRecord,jsonBody,tables} from '@/lib/server';
 import {createSession,hashPassword,isValidEmail,isValidPassword,normalizeEmail,withSessionCookie} from '@/lib/session-auth';
 
@@ -17,7 +18,9 @@ export async function POST(request:Request){
  try{
   guard(request);
   await ensureAuthTables();
+  await assertRateLimit('auth:register-ip:'+clientIp(request),8,60*60*1000);
   const body=bodySchema.parse(await jsonBody(request,4000));
+  await assertRateLimit('auth:register:'+normalizeEmail(body.email),5,60*60*1000);
   const email=normalizeEmail(body.email);
   if(!isValidEmail(email))throw new ApiError(400,'Please enter a valid email address.');
   if(!isValidPassword(body.password))throw new ApiError(400,'Password must be at least 8 characters.');

@@ -138,6 +138,41 @@ export async function changePassword(userId:string,currentPassword:string,nextPa
  return createSession(userId);
 }
 
+export async function requestPasswordReset(email:string){
+ const normalized=normalizeEmail(email);
+ if(!isValidEmail(normalized))return null;
+ const database=authDb();
+ const row=await database.prepare('SELECT user_id FROM auth_accounts WHERE email = ?').bind(normalized).first<{user_id:string}>();
+ if(!row)return null;
+ const token=bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
+ const now=new Date().toISOString();
+ await database.batch([
+  database.prepare('DELETE FROM auth_password_resets WHERE user_id = ? AND used_at IS NULL').bind(row.user_id),
+  database.prepare('INSERT INTO auth_password_resets (id,user_id,token_hash,expires_at,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),row.user_id,await sha256Hex(token),new Date(Date.now()+60*60*1000).toISOString(),now),
+ ]);
+ return {token,userId:row.user_id,email:normalized};
+}
+
+export async function completePasswordReset(token:string,nextPassword:string){
+ if(!token||token.length<32||token.length>128)throw new AuthError(400,'This reset link is invalid.');
+ if(!isValidPassword(nextPassword))throw new AuthError(400,'Password must be at least 8 characters.');
+ const database=authDb();
+ const tokenHash=await sha256Hex(token);
+ const row=await database.prepare('SELECT id, user_id FROM auth_password_resets WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?').bind(tokenHash,new Date().toISOString()).first<{id:string;user_id:string}>();
+ if(!row)throw new AuthError(400,'This reset link has expired or was already used. Request a new one.');
+ const passwordHash=await hashPassword(nextPassword);
+ const usedAt=new Date().toISOString();
+ const claimed=await database.prepare('UPDATE auth_password_resets SET used_at = ? WHERE id = ? AND used_at IS NULL AND expires_at > ?').bind(usedAt,row.id,usedAt).run();
+ if(!claimed.meta.changes)throw new AuthError(400,'This reset link has expired or was already used. Request a new one.');
+ await database.batch([
+  database.prepare('UPDATE auth_accounts SET password_hash = ? WHERE user_id = ?').bind(passwordHash,row.user_id),
+  database.prepare('DELETE FROM auth_sessions WHERE user_id = ?').bind(row.user_id),
+  database.prepare('DELETE FROM auth_password_resets WHERE user_id = ? AND id != ?').bind(row.user_id,row.id),
+ ]);
+ const session=await createSession(row.user_id);
+ return {userId:row.user_id,token:session};
+}
+
 export function withSessionCookie(data:unknown,token:string,request:Request,status=200){
  const secure=new URL(request.url).protocol==='https:';
  return Response.json(data,{status,headers:{'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Set-Cookie':sessionCookieHeader(token,secure)}});

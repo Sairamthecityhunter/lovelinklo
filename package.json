@@ -13,7 +13,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-postgres.mjs",
-    "test:e2e": "node tests/postgres-auth.e2e.mjs"
+    "test:e2e": "node tests/postgres-auth.e2e.mjs && node tests/couple-space.e2e.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

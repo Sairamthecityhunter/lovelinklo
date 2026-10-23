@@ -1,4 +1,46 @@
 'use client';
 import {useState} from 'react';
 import {Heart,Link} from 'lucide-react';
-export default function AcceptInvite({token}:{token:string}){const [busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false);return <main className="invite-page"><div className="card invite-card"><img src="/logo-mark.png" alt="LoveLink" className="brand-logo brand-logo-mark"/><p className="eyebrow">A LITTLE WORLD, JUST FOR TWO</p><h1>{done?'Your next chapter starts here.':'Someone saved you a place.'}</h1><p>{done?'Your shared moments are ready. Your private pins and surprises stay private.':'Accept this invitation to connect your couple spaces. Items you’ve marked as shared will become visible to your partner. Private surprises stay yours.'}</p>{error&&<p className="form-error" role="alert">{error}</p>}{done?<a className="primary-button" href="/">Open our space <Heart size={16}/></a>:<button className="primary-button" disabled={busy||!token} onClick={async()=>{setBusy(true);setError('');try{const r=await fetch('/api/invite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({op:'accept',token})});const d=await r.json() as {error?:string};if(!r.ok)throw Error(d.error||"Unable to accept invitation.");setDone(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}><Link size={16}/>{busy?'Connecting…':'Accept invitation'}</button>}<a href="/">Back to my space</a></div></main>;}
+
+export default function AcceptInvite({token,code}:{token:string;code:string}){
+ const [busy,setBusy]=useState(false);
+ const [error,setError]=useState('');
+ const [done,setDone]=useState(false);
+ const [manual,setManual]=useState(code);
+ const value=token||manual;
+
+ async function accept(){
+  setBusy(true);
+  setError('');
+  try{
+   const r=await fetch('/api/invite',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(token?{op:'accept',token}:{op:'accept',code:manual}),
+   });
+   const d=await r.json() as {error?:string};
+   if(!r.ok)throw Error(d.error||'Unable to accept invitation.');
+   setDone(true);
+  }catch(e){setError((e as Error).message);}
+  finally{setBusy(false);}
+ }
+
+ return (
+  <main className="invite-page">
+   <div className="card invite-card">
+    <img src="/logo-mark.png" alt="LoveLink" className="brand-logo brand-logo-mark"/>
+    <p className="eyebrow">A LITTLE WORLD, JUST FOR TWO</p>
+    <h1>{done?'Your next chapter starts here.':'Someone saved you a place.'}</h1>
+    <p>{done?'Your shared moments are ready. Your private pins and surprises stay private.':'Accept this invitation to connect your couple spaces. Items you’ve marked as shared will become visible to your partner. Private surprises stay yours.'}</p>
+    {error&&<p className="form-error" role="alert">{error}</p>}
+    {done?<a className="primary-button" href="/us">Open our space <Heart size={16}/></a>:(
+     <>
+      {!token&&<label className="invite-code-field">Invitation code<input value={manual} onChange={e=>setManual(e.target.value)} placeholder="XXXX-XXXX" maxLength={20} autoCapitalize="characters" aria-label="Invitation code"/></label>}
+      <button className="primary-button" disabled={busy||!value} onClick={()=>void accept()}><Link size={16}/>{busy?'Connecting…':'Accept invitation'}</button>
+     </>
+    )}
+    <a href="/">Back to my space</a>
+   </div>
+  </main>
+ );
+}

@@ -4,6 +4,9 @@ declare namespace NodeJS {
     POSTGRES_URL?: string;
     AUTH_SECRET?: string;
     SESSION_SECRET?: string;
+    APP_URL?: string;
+    RESEND_API_KEY?: string;
+    EMAIL_FROM?: string;
     OPENAI_API_KEY?: string;
     OPENAI_MODEL?: string;
     NOTIFICATION_GATEWAY_URL?: string;

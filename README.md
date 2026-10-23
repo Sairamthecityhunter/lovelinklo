@@ -5,6 +5,7 @@ A working couples website and installable progressive web app. Love Wish Pins ar
 ## Product structure
 
 - `/`: private couple dashboard, both clocks, relationship duration, Don't Forget card, live countdown, active wishes, gift ideas, recent memory, and upcoming dates.
+- `/us`: shared couple space — invite/code pairing, love notes, shared photo timeline, anniversary countdown, bucket list, and a daily mood check-in that stays hidden from your partner until you answer.
 - `/pins`: create/edit/delete wishes; all ten types; 13 preset offsets; custom days/hours/minutes; recurrence; secret mode; search; completed/recurring views; snooze; notification actions.
 - `/calendar`: month navigation, birthdays and annual events, all pinned tasks, linked wishes, and occasion planning.
 - `/gifts`: searchable sample products and experiences, budget/delivery-date filters, gift guide, wishlist actions, delivery estimates, demo checkout, and saved demo orders.
@@ -32,6 +33,9 @@ The main UI and forms are in `app/lovelink.tsx`, `app/love-forms.tsx`, and `app/
 | Route | Behavior |
 | --- | --- |
 | GET `/api/state` | Authenticated, privacy-filtered couple state |
+| GET/POST `/api/couple` | Linked-partner notes and daily check-ins (scoped to `couple_id`) |
+| GET/POST `/api/invite` | Create, cancel, or accept a partner invite (link or 8-character code) |
+| POST `/api/auth/forgot` `/api/auth/reset` | Password reset request and token consumption |
 | POST `/api/state` | Validated record/profile changes, completion, snooze, inbox generation, thinking-of-you, clear, disconnect and account deletion |
 | POST `/api/invite` | Create a seven-day, hashed, single-use invitation or atomically accept it |
 | POST `/api/media` | Validate media signatures and size, store private bytes and ownership metadata |
@@ -90,16 +94,19 @@ Set these on the `lovelinklos` Vercel project (Production and Preview):
 | --- | --- |
 | `DATABASE_URL` | Postgres connection string (Neon pooled URL recommended). `POSTGRES_URL` is accepted as an alias. |
 | `AUTH_SECRET` | Random 32+ character secret used to hash session tokens. `SESSION_SECRET` is an optional alias. Generate with `openssl rand -base64 48`. |
+| `APP_URL` | Public origin for invite links, password-reset emails, sitemap, and Open Graph. Example: `https://lovelinklos.vercel.app`. Optional locally. |
+| `RESEND_API_KEY` | Optional. With `EMAIL_FROM`, sends password-reset email. Forgot-password still works without it, but no email is delivered. |
+| `EMAIL_FROM` | Optional verified sender for Resend, e.g. `LoveLink <hello@yourdomain.com>`. |
 
 Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unchanged. After provisioning the database, apply schema with `pnpm db:migrate` (or `npm run db:migrate`) using that `DATABASE_URL`. Vercel does not apply migrations automatically.
 
 ### Deploying `lovelinklos` from this branch
 
 1. In the Vercel project **lovelinklos**, set Git to deploy this branch (not `main`).
-2. Add `DATABASE_URL` (Neon or Marketplace Postgres) and `AUTH_SECRET`.
-3. From a machine that can reach the database: `pnpm db:migrate`.
+2. Add `DATABASE_URL`, `AUTH_SECRET`, and `APP_URL`. Optionally `RESEND_API_KEY` and `EMAIL_FROM` for password-reset email.
+3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000` and `0001`).
 4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
-5. Confirm `/login` and `/register` create a session and that creating a wish pin survives a reload.
+5. Confirm `/register`, `/us` invite+accept, and creating a wish pin survive a reload.
 
 ## Development
 
@@ -117,7 +124,7 @@ pnpm dev
 
 - `node --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, and D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases).
 - `pnpm exec tsc --noEmit`: typed application and route checks.
-- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up, session cookie, pin create/save, logout, sign-in, and durable read against local Postgres. Test identities are synthetic.
+- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, and a third user denied access. Test identities are synthetic.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
 
 Two structured browser tools are included: `list_love_pins` (read only) and `start_love_pin` (opens the editor without saving). Inputs are validated and outputs use the same visible state as the interface.
