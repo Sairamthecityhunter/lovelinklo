@@ -79,13 +79,20 @@ export async function POST(request: Request) {
     const partner = await database.prepare('SELECT profile_json FROM users WHERE id = ?').bind(row.inviter_id).first<{profile_json: string}>();
     if (!partner) throw new ApiError(404, 'This invitation is no longer available.');
     const p = JSON.parse(partner.profile_json);
-    const profile = {
+    const joinerName = (ctx.profile.myName || '').trim() || 'Your partner';
+    const inviterName = (p.myName || '').trim() || 'Your partner';
+    const now = new Date().toISOString();
+    const joinerProfile = {
       ...ctx.profile,
-      myName: p.partnerName,
-      partnerName: p.myName,
-      myTimezone: p.partnerTimezone,
-      partnerTimezone: p.myTimezone,
-      togetherSince: p.togetherSince,
+      partnerName: inviterName,
+      partnerTimezone: p.myTimezone || ctx.profile.partnerTimezone,
+      togetherSince: p.togetherSince || ctx.profile.togetherSince,
+      sample: false,
+    };
+    const inviterProfile = {
+      ...p,
+      partnerName: joinerName,
+      partnerTimezone: ctx.profile.myTimezone || p.partnerTimezone,
       sample: false,
     };
     const claim = database.prepare(
@@ -93,7 +100,10 @@ export async function POST(request: Request) {
     ).bind(ctx.userId, row.id, new Date().toISOString(), row.couple_id);
     const change = database.prepare(
       'UPDATE users SET couple_id = ?, profile_json = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)',
-    ).bind(row.couple_id, JSON.stringify(profile), new Date().toISOString(), ctx.userId, row.id, ctx.userId);
+    ).bind(row.couple_id, JSON.stringify(joinerProfile), now, ctx.userId, row.id, ctx.userId);
+    const updateInviter = database.prepare(
+      'UPDATE users SET profile_json = ?, updated_at = ? WHERE id = ? AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)',
+    ).bind(JSON.stringify(inviterProfile), now, row.inviter_id, row.id, ctx.userId);
     const claimed = (idSql: string, params: unknown[]) =>
       database.prepare(`${idSql} AND EXISTS (SELECT 1 FROM partner_invitations WHERE id = ? AND accepted_by = ?)`).bind(...params, row.id, ctx.userId);
     const move = Object.values(tables).map((t) =>
@@ -102,6 +112,7 @@ export async function POST(request: Request) {
     const results = await database.batch([
       claim,
       change,
+      updateInviter,
       ...move,
       claimed('DELETE FROM world_sessions WHERE user_id = ?', [ctx.userId]),
       claimed('UPDATE media SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),

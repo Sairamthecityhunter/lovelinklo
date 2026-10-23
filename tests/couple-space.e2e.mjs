@@ -126,11 +126,22 @@ try {
   const stateB = await asB('/api/state');
   assert.equal(stateB.status, 200, JSON.stringify(stateB.data));
   assert.equal(stateB.data.connected, true);
+  assert.equal(stateB.data.profile.myName, 'Maya');
+  assert.equal(stateB.data.profile.partnerName, 'Alex');
+  const stateA = await asA('/api/state');
+  assert.equal(stateA.status, 200, JSON.stringify(stateA.data));
+  assert.equal(stateA.data.connected, true);
+  assert.equal(stateA.data.profile.myName, 'Alex');
+  assert.equal(stateA.data.profile.partnerName, 'Maya', 'inviter should see the name the partner registered with');
   assert.ok(stateB.data.memories.some((item) => item.title === 'Only linked partners should see this pier'), 'linked partner should see shared memories');
 
   const coupleB = await asB('/api/couple');
   assert.equal(coupleB.status, 200, JSON.stringify(coupleB.data));
   assert.equal(coupleB.data.connected, true);
+  assert.equal(coupleB.data.partner?.name, 'Alex');
+  const coupleA = await asA('/api/couple');
+  assert.equal(coupleA.status, 200, JSON.stringify(coupleA.data));
+  assert.equal(coupleA.data.partner?.name, 'Maya');
   assert.ok(coupleB.data.notes.some((item) => item.id === noteId), 'linked partner should see shared notes');
   assert.equal(coupleB.data.checkIn.partner, 'hidden');
   assert.equal(coupleB.data.checkIn.mine, null);
