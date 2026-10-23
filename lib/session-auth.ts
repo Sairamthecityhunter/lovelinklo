@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '@/lib/cf-env';
 import {cookies,headers} from 'next/headers';
 import type {ChatGPTUser} from '@/app/chatgpt-auth';
 import type {Profile} from './love-types';
@@ -12,7 +12,8 @@ const loginAttempts=new Map<string,{count:number;lockedUntil:number}>();
 function authDb(){if(!env.DB)throw new AuthError(503,'Your saved space is temporarily unavailable. Please try again.');return env.DB;}
 function bytesToHex(bytes:Uint8Array){return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function hexToBytes(hex:string){const out=new Uint8Array(hex.length/2);for(let i=0;i<out.length;i++)out[i]=parseInt(hex.slice(i*2,i*2+2),16);return out;}
-async function sha256Hex(value:string){return bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))));}
+function sessionSecret(){return process.env.AUTH_SECRET||process.env.SESSION_SECRET||'';}
+async function sha256Hex(value:string){return bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(sessionSecret()+value))));}
 function timingSafeEqual(a:string,b:string){if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
 
 export function normalizeEmail(email:string){return email.trim().toLowerCase();}
@@ -61,6 +62,9 @@ export function clearSessionCookieHeader(secure:boolean){
 }
 
 export async function createSession(userId:string){
+ if((process.env.VERCEL || process.env.NODE_ENV==='production') && !sessionSecret()){
+  throw new AuthError(503,'AUTH_SECRET is not configured.');
+ }
  const token=bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
  const tokenHash=await sha256Hex(token);
  await authDb().prepare('INSERT INTO auth_sessions (id,user_id,token_hash,expires_at,created_at) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),userId,tokenHash,sessionExpiry(),new Date().toISOString()).run();

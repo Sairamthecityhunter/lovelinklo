@@ -19,7 +19,9 @@ A working couples website and installable progressive web app. Love Wish Pins ar
 
 ## Architecture
 
-The app uses TypeScript, React 19, the Next.js App Router API through Vinext, Tailwind CSS, and the bundled Radix/Shadcn primitives. It runs as an ESM Cloudflare Worker. This deployment uses managed SQLite/D1 and Drizzle instead of the brief's suggested PostgreSQL/Prisma stack, so it is fully compatible with the hosting environment. Object storage holds private uploaded images. No personal record uses browser storage as its source of truth.
+The app uses TypeScript, React 19, the Next.js App Router, Tailwind CSS, and the bundled Radix/Shadcn primitives. This branch runs on Vercel’s Node.js runtime with a standard Postgres database (Neon or Vercel Marketplace Postgres) through `DATABASE_URL`. Drizzle owns the schema and migrations. Uploaded media is stored as `bytea` rows in Postgres (`media_blobs`), so no Cloudflare R2/KV/D1 bindings are required. Sessions are hashed with `AUTH_SECRET` and stored in `auth_sessions`. No personal record uses browser storage as its source of truth.
+
+The original Cloudflare Worker / D1 deployment remains on the default branch for the `lovelinklo` project. Do not merge this branch there.
 
 Server handlers check the dispatch-provided authenticated user on every account API. The live website is initially owner-private. The anonymous local preview explicitly uses an in-memory example couple; refreshing that demo resets it. Signed-in users receive a durable starter dataset on first use and can personalize the profile or clear the example content.
 
@@ -78,19 +80,44 @@ This is a functional first version with production-oriented authorization and pe
 - **Partner access:** the invitation flow is implemented and tested. A second person needs Site audience access as well as an invitation; publishing does not widen the audience automatically. Share settings must be changed explicitly by the owner.
 - **Future expansion:** recap video export, digital gift-card fulfillment and physical tracking inside surprise boxes, Google Calendar synchronization, third-party booking/search, QR invitations, granular wishlist sizing/favorites, and native app-store packages remain follow-on work. Their associated integration data models are included where applicable, but no UI claims that those services are live.
 
-`.env.example` lists every optional secret. Never commit `.env` or a real key. The logical `DB` and `BUCKET` bindings live in `.openai/hosting.json`; hosting owns actual resources.
+`.env.example` lists every required and optional secret. Never commit `.env`, `.env.local`, or a real key.
+
+### Required environment variables (Vercel / Node)
+
+Set these on the `lovelinklos` Vercel project (Production and Preview):
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string (Neon pooled URL recommended). `POSTGRES_URL` is accepted as an alias. |
+| `AUTH_SECRET` | Random 32+ character secret used to hash session tokens. `SESSION_SECRET` is an optional alias. Generate with `openssl rand -base64 48`. |
+
+Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unchanged. After provisioning the database, apply schema with `pnpm db:migrate` (or `npm run db:migrate`) using that `DATABASE_URL`. Vercel does not apply migrations automatically.
+
+### Deploying `lovelinklos` from this branch
+
+1. In the Vercel project **lovelinklos**, set Git to deploy this branch (not `main`).
+2. Add `DATABASE_URL` (Neon or Marketplace Postgres) and `AUTH_SECRET`.
+3. From a machine that can reach the database: `pnpm db:migrate`.
+4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
+5. Confirm `/login` and `/register` create a session and that creating a wish pin survives a reload.
 
 ## Development
 
-Use Node.js 22.13+ (Node.js 24 supports the type-stripping test runner). Preserve `pnpm-lock.yaml` and the declared package manager. Run `pnpm install`, `pnpm dev`, and `pnpm build` in a standalone environment. The portable development profile supports loopback-only development authentication; production authentication is provided by the hosting dispatcher. When using the Sites plugin, use its setup/build/preview/publishing helpers rather than starting another server.
+Use Node.js 22.13+. Preserve `pnpm-lock.yaml` and the declared package manager. Create a local Postgres database, copy `.env.example` to `.env.local`, set `DATABASE_URL` and `AUTH_SECRET`, then:
 
-After a schema edit: generate a new migration with `pnpm db:generate`, inspect its SQL, and apply each pending migration to the local D1 before authenticated preview testing. Publication applies the packaged production migrations.
+```bash
+pnpm install
+pnpm db:migrate
+pnpm dev
+```
+
+`pnpm build` / `next build` produce the Vercel production bundle. `pnpm start` / `next start` serve it. After a schema edit, generate a new Postgres migration with `pnpm db:generate`, inspect the SQL, and apply it with `pnpm db:migrate`.
 
 ### Validation
 
 - `node --test tests/love-time.test.mjs tests/love-extras.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, and timezone conversion, DST gaps/overlaps, recurrence through DST/month ends, custom offsets, snooze and countdown thresholds.
 - `pnpm exec tsc --noEmit`: typed application and route checks.
-- After a build, `node --import ./scripts/sites-env.mjs tests/api.test.mjs`: the actual compiled Worker in an isolated Miniflare database. Covers auth, durable CRUD, validation, two-user isolation, shared/private records, invitation atomicity and reuse, delayed letter visibility, snooze, idempotent notifications, missing-provider behavior, cross-site rejection, scheduled surprise JSON/media access, cross-user media attachment rejection, unsafe playlist URLs, mismatched media types, streaming ranges and privacy revocation. Test identities and data are synthetic; tests do not call external providers or production.
+- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up, session cookie, pin create/save, logout, sign-in, and durable read against local Postgres. Test identities are synthetic.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
 
 Two structured browser tools are included: `list_love_pins` (read only) and `start_love_pin` (opens the editor without saving). Inputs are validated and outputs use the same visible state as the interface.
@@ -101,7 +128,7 @@ Assets are local and optimized. Source URLs, photographers and reuse labels are 
 
 ## Date Concierge and business features
 
-`/concierge` provides curated date plans with a budget split, timezone-aware itinerary, saved checklist, calendar event and four linked reminders, plus text itinerary export. Plans and private drafts persist in `concierge_records`. Calendar insertion is a single D1 batch with deterministic IDs, so retries cannot duplicate its event or pins. Checklist completion and Love Pin completion are separate controls. Created calendar entries remain after deleting a plan.
+`/concierge` provides curated date plans with a budget split, timezone-aware itinerary, saved checklist, calendar event and four linked reminders, plus text itinerary export. Plans and private drafts persist in `concierge_records`. Calendar insertion is a single database transaction with deterministic IDs, so retries cannot duplicate its event or pins. Checklist completion and Love Pin completion are separate controls. Created calendar entries remain after deleting a plan.
 
 The shop includes three digital date scripts ($5.99, $7.99, $5.99). Confirmed purchases unlock their server-delivered content; active couple Premium includes all three. Refunds revoke future access. Existing downloaded content cannot be recalled. Existing Premium pricing remains $4.99/month. No real charges occur while the existing payment switch is disabled.
 

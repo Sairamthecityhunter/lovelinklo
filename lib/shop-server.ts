@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '@/lib/cf-env';
 import {z} from 'zod';
 import {db,ApiError} from './server';
 import {SHOP_ITEMS,WORLD_THEMES,type WorldTheme} from './shop-catalog';

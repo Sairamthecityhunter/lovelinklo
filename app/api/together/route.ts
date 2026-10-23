@@ -50,7 +50,7 @@ export async function POST(request:Request){try{
   const tasks=[{title:'Prepare: '+plan.title,type:'Date',days:1},{title:'A little gesture for us',type:'Wish',days:0},{title:plan.title,type:'Date',days:0}];
   const pins=tasks.map((t,i)=>pinSchema.parse({id:eventId+'-'+i,title:t.title,type:t.type,message:i===1?plan.gesture:plan.steps.join('\n'),dueAt:new Date(Math.max(Date.now()+60000,Date.parse(plan.dueAt)-t.days*86400000)).toISOString(),timezone:plan.timezone,reminderMinutes:0,repeat:'none',eventId,secret:false,done:false,createdAt:new Date().toISOString()}));
   plan.calendarAdded=true;
-  try{await database.batch([insertRecord('events',event,ctx.userId,ctx.coupleId),...pins.map(p=>insertRecord('pins',p,ctx.userId,ctx.coupleId)),database.prepare("UPDATE together_plans SET data_json=json_set(data_json,'$.calendarAdded',json('true')) WHERE id=? AND couple_id=?").bind(id,ctx.coupleId)]);}catch{throw new ApiError(409,'The plan may have just changed. Refresh before trying again.');}
+  try{await database.batch([insertRecord('events',event,ctx.userId,ctx.coupleId),...pins.map(p=>insertRecord('pins',p,ctx.userId,ctx.coupleId)),database.prepare("UPDATE together_plans SET data_json=(jsonb_set(data_json::jsonb,'{calendarAdded}','true'::jsonb))::text WHERE id=? AND couple_id=?").bind(id,ctx.coupleId)]);}catch{throw new ApiError(409,'The plan may have just changed. Refresh before trying again.');}
   return response({added:true});
  }else throw new ApiError(400,'Choose a valid Together action.');
  const changed=await database.prepare('UPDATE together_plans SET data_json=? WHERE id=? AND couple_id=? AND data_json=?').bind(JSON.stringify(plan),id,ctx.coupleId,row.data_json).run();

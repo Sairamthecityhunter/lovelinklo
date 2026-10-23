@@ -5,8 +5,8 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
  const row=await db().prepare('SELECT * FROM media WHERE id = ? AND couple_id = ?').bind(id,ctx.coupleId).first<{owner_id:string;object_key:string;mime:string;size:number}>();
  if(!row)throw new ApiError(404,'This media is private or unavailable.');
  if(row.owner_id!==ctx.userId){
-  const visible=await db().prepare("SELECT id FROM memories WHERE couple_id = ? AND secret = 0 AND json_extract(data_json, '$.image') = ? LIMIT 1").bind(ctx.coupleId,'/api/media/'+id).first();
-  if(!visible){const surprise=await db().prepare("SELECT s.id FROM surprises s, json_each(s.data_json, '$.assets') a WHERE s.couple_id = ? AND s.secret = 0 AND s.due_at <= ? AND json_extract(a.value, '$.url') = ? LIMIT 1").bind(ctx.coupleId,new Date().toISOString(),'/api/media/'+id).first();if(!surprise)throw new ApiError(404,'This media is private or unavailable.');}
+  const visible=await db().prepare("SELECT id FROM memories WHERE couple_id = ? AND secret = 0 AND data_json::jsonb->>'image' = ? LIMIT 1").bind(ctx.coupleId,'/api/media/'+id).first();
+  if(!visible){const surprise=await db().prepare("SELECT s.id FROM surprises s CROSS JOIN LATERAL jsonb_array_elements(COALESCE(s.data_json::jsonb->'assets','[]'::jsonb)) AS a WHERE s.couple_id = ? AND s.secret = 0 AND s.due_at <= ? AND a->>'url' = ? LIMIT 1").bind(ctx.coupleId,new Date().toISOString(),'/api/media/'+id).first();if(!surprise)throw new ApiError(404,'This media is private or unavailable.');}
  }
  let range;try{range=byteRange(request.headers.get('range'),row.size);}catch{return new Response(null,{status:416,headers:{'Content-Range':`bytes */${row.size}`,'Cache-Control':'private, no-store'}});}
  const file=await storage().get(row.object_key,range?{range}:undefined);if(!file)throw new ApiError(404,'This media is unavailable.');

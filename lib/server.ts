@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '@/lib/cf-env';
 import {getChatGPTUser} from '@/app/chatgpt-auth';
 import {seedState} from './love-data';
 import {reminderAt} from './love-time';
