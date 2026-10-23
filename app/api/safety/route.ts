@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       }
       return response({
         reported: true,
-        blocked: alsoBlocked,
+        alsoBlocked,
         confirmation: 'We received your report. They will not be told that you reported them.',
         ...(await safetyPayload(ctx)),
       });

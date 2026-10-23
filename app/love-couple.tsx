@@ -58,7 +58,7 @@ async function safetyRequest(body?: Record<string, unknown>) {
     headers: body ? {'Content-Type': 'application/json'} : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await r.json() as SafetyPayload & {error?: string; confirmation?: string; reported?: boolean; blocked?: boolean};
+  const data = await r.json() as SafetyPayload & {error?: string; confirmation?: string; reported?: boolean; alsoBlocked?: boolean};
   if (!r.ok) throw new Error(data.error || 'Could not update safety settings.');
   return data;
 }
