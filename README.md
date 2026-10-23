@@ -115,7 +115,7 @@ pnpm dev
 
 ### Validation
 
-- `node --test tests/love-time.test.mjs tests/love-extras.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, and timezone conversion, DST gaps/overlaps, recurrence through DST/month ends, custom offsets, snooze and countdown thresholds.
+- `node --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, and D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases).
 - `pnpm exec tsc --noEmit`: typed application and route checks.
 - After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up, session cookie, pin create/save, logout, sign-in, and durable read against local Postgres. Test identities are synthetic.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
