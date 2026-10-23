@@ -116,7 +116,7 @@ export async function POST(request: Request) {
         }
       }
       const interests = JSON.stringify((parsed.interests || []).map((item) => item.trim()).filter(Boolean).slice(0, 12));
-      if (body.op === 'create') {
+      if (parsed.op === 'create') {
         const id = crypto.randomUUID();
         await database.prepare(
           `INSERT INTO special_days (id, owner_user_id, person_user_id, name, type, label, month, day, year, interests, created_at)
