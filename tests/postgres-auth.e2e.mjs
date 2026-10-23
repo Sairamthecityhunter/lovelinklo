@@ -19,6 +19,7 @@ const port = process.env.E2E_PORT || String(3200 + Math.floor(Math.random() * 20
 const base = (process.env.BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
 const email = `e2e-${Date.now()}@lovelink.test`;
 const password = 'correct-horse-e2e-1';
+const testIp = `198.51.100.${Date.now() % 250}`;
 let cookie = '';
 let child;
 
@@ -30,7 +31,7 @@ function cookieFrom(response) {
 }
 
 async function request(path, {method = 'GET', body, withCookie = true} = {}) {
-  const headers = {'Content-Type': 'application/json'};
+  const headers = {'Content-Type': 'application/json', 'X-Forwarded-For': testIp};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (withCookie && cookie) headers.Cookie = `__lovelink_session=${cookie}`;
   const response = await fetch(base + path, {

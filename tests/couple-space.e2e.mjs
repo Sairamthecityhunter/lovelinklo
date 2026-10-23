@@ -18,12 +18,13 @@ process.env.SESSION_SECRET ||= process.env.AUTH_SECRET;
 const port = process.env.E2E_PORT || String(3400 + Math.floor(Math.random() * 200));
 const base = (process.env.BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
 const stamp = Date.now();
+const testIp = `203.0.113.${stamp % 250}`;
 let child;
 
 function makeClient() {
   let cookie = '';
   return async function request(path, {method = 'GET', body, withCookie = true} = {}) {
-    const headers = {'Content-Type': 'application/json'};
+    const headers = {'Content-Type': 'application/json', 'X-Forwarded-For': testIp};
     if (withCookie && cookie) headers.Cookie = `__lovelink_session=${cookie}`;
     const response = await fetch(base + path, {
       method,
