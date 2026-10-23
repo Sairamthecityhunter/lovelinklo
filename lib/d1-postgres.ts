@@ -53,6 +53,11 @@ export function toPostgresSql(sql: string) {
  if (ignore && !/\bON CONFLICT\b/i.test(out)) {
   out = out.replace(/\s*;\s*$/, '') + ' ON CONFLICT DO NOTHING';
  }
+ // Postgres folds unquoted identifiers to lowercase; D1 keeps `AS userId`.
+ out = out.replace(/\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b/gi, (match, alias: string) => {
+  if (/[A-Z]/.test(alias) && alias !== alias.toUpperCase()) return `AS "${alias}"`;
+  return match;
+ });
  let index = 0;
  out = out.replace(/\?/g, () => `$${++index}`);
  return out;
