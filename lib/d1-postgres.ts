@@ -62,35 +62,44 @@ function asResult<T>(rows: T[], rowCount: number | null): D1Result<T> {
  return {success: true, results: rows, meta: {changes: rowCount ?? 0, last_row_id: 0}};
 }
 
-class PgStatement implements D1PreparedStatement {
- constructor(private readonly db: PgDatabase, private readonly sql: string, private readonly params: unknown[] = []) {}
- bind(...values: unknown[]) {
-  return new PgStatement(this.db, this.sql, values);
- }
- async first<T = Record<string, unknown>>() {
-  const result = await this.db.exec(this.sql, this.params);
-  return (result.rows[0] as T) ?? null;
- }
- async all<T = Record<string, unknown>>() {
-  const result = await this.db.exec(this.sql, this.params);
-  return asResult(result.rows as T[], result.rowCount);
- }
- async run<T = Record<string, unknown>>() {
-  const result = await this.db.exec(this.sql, this.params);
-  return asResult(result.rows as T[], result.rowCount);
- }
- toBound(): BoundStatement {
-  return {sql: this.sql, params: this.params};
- }
+function boundOf(statement: D1PreparedStatement): BoundStatement {
+ const bound = statement as D1PreparedStatement & {__bound?: BoundStatement};
+ if (!bound.__bound) throw new Error('Invalid prepared statement');
+ return bound.__bound;
+}
+
+function createStatement(runQuery: (sql: string, params: unknown[]) => Promise<pg.QueryResult>, sql: string, params: unknown[] = []): D1PreparedStatement {
+ const statement: D1PreparedStatement & {__bound: BoundStatement} = {
+  __bound: {sql, params},
+  bind(...values: unknown[]) {
+   return createStatement(runQuery, sql, values);
+  },
+  async first<T = Record<string, unknown>>() {
+   const result = await runQuery(sql, params);
+   return (result.rows[0] as T) ?? null;
+  },
+  async all<T = Record<string, unknown>>() {
+   const result = await runQuery(sql, params);
+   return asResult(result.rows as T[], result.rowCount);
+  },
+  async run<T = Record<string, unknown>>() {
+   const result = await runQuery(sql, params);
+   return asResult(result.rows as T[], result.rowCount);
+  },
+ };
+ return statement;
 }
 
 export class PgDatabase implements D1DatabaseLike {
- constructor(private readonly pool: pg.Pool) {}
- prepare(sql: string) {
-  return new PgStatement(this, sql);
+ pool: pg.Pool;
+ constructor(pool: pg.Pool) {
+  this.pool = pool;
  }
- async exec(sql: string, params: unknown[] = []) {
+ async querySql(sql: string, params: unknown[] = []) {
   return this.pool.query(toPostgresSql(sql), params);
+ }
+ prepare(sql: string) {
+  return createStatement((text, params) => this.querySql(text, params), sql);
  }
  async batch<T = Record<string, unknown>>(statements: D1PreparedStatement[]) {
   const client = await this.pool.connect();
@@ -98,7 +107,7 @@ export class PgDatabase implements D1DatabaseLike {
    await client.query('BEGIN');
    const results: D1Result<T>[] = [];
    for (const statement of statements) {
-    const bound = (statement as PgStatement).toBound();
+    const bound = boundOf(statement);
     const result = await client.query(toPostgresSql(bound.sql), bound.params);
     results.push(asResult(result.rows as T[], result.rowCount));
    }

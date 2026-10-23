@@ -24,12 +24,12 @@ export async function POST(request:Request){
   const database=db();
   const existing=await database.prepare('SELECT user_id FROM auth_accounts WHERE email = ?').bind(email).first();
   if(existing)throw new ApiError(409,'An account with this email already exists. Please sign in.');
+  const passwordHash=await hashPassword(body.password);
   const userId=crypto.randomUUID();
   const coupleId=crypto.randomUUID();
   const now=new Date().toISOString();
   const seed=seedState();
   const profile:Profile={...seed.profile,myName:body.name.trim(),partnerName:'Your partner',sample:true};
-  const passwordHash=await hashPassword(body.password);
   const statements=[
    database.prepare('INSERT INTO couples (id, owner_id, created_at) VALUES (?, ?, ?)').bind(coupleId,userId,now),
    database.prepare('INSERT INTO users (id, couple_id, profile_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').bind(userId,coupleId,JSON.stringify(profile),now,now),

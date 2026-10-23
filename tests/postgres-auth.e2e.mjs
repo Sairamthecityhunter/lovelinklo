@@ -15,9 +15,8 @@ if (!url) {
 process.env.AUTH_SECRET ||= 'local-e2e-auth-secret-not-for-production-use';
 process.env.SESSION_SECRET ||= process.env.AUTH_SECRET;
 
-const port = process.env.E2E_PORT || '3100';
+const port = process.env.E2E_PORT || String(3200 + Math.floor(Math.random() * 200));
 const base = (process.env.BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
-const origin = base;
 const email = `e2e-${Date.now()}@lovelink.test`;
 const password = 'correct-horse-e2e-1';
 let cookie = '';
@@ -31,7 +30,7 @@ function cookieFrom(response) {
 }
 
 async function request(path, {method = 'GET', body, withCookie = true} = {}) {
-  const headers = {Origin: origin, 'X-Content-Type-Options': 'nosniff'};
+  const headers = {'Content-Type': 'application/json'};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (withCookie && cookie) headers.Cookie = `__lovelink_session=${cookie}`;
   const response = await fetch(base + path, {
