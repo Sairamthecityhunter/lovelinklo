@@ -148,11 +148,13 @@ try {
   const safetyB = await asB('/api/safety');
   assert.equal(safetyB.status, 200, JSON.stringify(safetyB.data));
   assert.equal(safetyB.data.canBlock, true);
-  assert.ok(!JSON.stringify(safetyB.data).includes(stored.rows[0].reporter_id), 'reported user must not see reporter id');
-  assert.ok(!JSON.stringify(safetyB.data).includes(emailA), 'reported user must not see reporter email');
   assert.ok(!('reports' in safetyB.data));
+  assert.ok(!('reporterId' in safetyB.data));
+  assert.ok(!('reporter_id' in safetyB.data));
   assert.ok(!('flaggedForReview' in safetyB.data));
   assert.ok(!('flagged_for_review' in safetyB.data));
+  assert.ok(!JSON.stringify(safetyB.data).includes(emailA), 'reported user must not see reporter email');
+  assert.ok(!JSON.stringify(safetyB.data).includes(details), 'reported user must not see report details');
 
   const blocked = await asA('/api/safety', {method: 'POST', body: {op: 'block'}});
   assert.equal(blocked.status, 200, JSON.stringify(blocked.data));
