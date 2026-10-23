@@ -91,7 +91,7 @@ try {
   assert.ok(Array.isArray(seeded.data.pins));
 
   const pin = {
-    id: 'e2e-pin',
+    id: `e2e-pin-${Date.now()}`,
     title: 'Postgres save check',
     message: 'Persisted through DATABASE_URL',
     type: 'Gift',
@@ -106,7 +106,7 @@ try {
   };
   const saved = await request('/api/state', {method: 'POST', body: {op: 'upsert', collection: 'pins', value: pin}});
   assert.equal(saved.status, 200, JSON.stringify(saved.data));
-  assert.equal(saved.data.pins.find((item) => item.id === 'e2e-pin')?.title, 'Postgres save check');
+  assert.equal(saved.data.pins.find((item) => item.id === pin.id)?.title, 'Postgres save check');
 
   await request('/api/auth/logout', {method: 'POST', body: {}});
   const afterLogout = await request('/api/state');
@@ -117,7 +117,7 @@ try {
   assert.equal(login.status, 200, JSON.stringify(login.data));
   const restored = await request('/api/state');
   assert.equal(restored.status, 200, JSON.stringify(restored.data));
-  assert.equal(restored.data.pins.find((item) => item.id === 'e2e-pin')?.message, 'Persisted through DATABASE_URL');
+  assert.equal(restored.data.pins.find((item) => item.id === pin.id)?.message, 'Persisted through DATABASE_URL');
 
   console.log('PASS: register, session cookie, seeded state, pin save, logout, sign-in, and durable read against Postgres.');
 } finally {
