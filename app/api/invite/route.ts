@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {publicAppUrl} from '@/lib/app-url';
 import {formatInviteCode,normalizeInviteCode,randomInviteCode,sha256Hex} from '@/lib/invite-code';
 import {assertRateLimit,clientIp} from '@/lib/rate-limit';
+import {pairingBlocked} from '@/lib/partner-safety';
 import {ApiError,db,ensureUser,failure,guard,jsonBody,response,tables} from '@/lib/server';
 
 export const dynamic = 'force-dynamic';
@@ -74,6 +75,9 @@ export async function POST(request: Request) {
     ).bind(new Date().toISOString(), tokenHash, codeHash).first<any>();
     if (!row) throw new ApiError(404, 'This invitation has expired or was already used. Ask for a fresh link or code.');
     if (row.inviter_id === ctx.userId) throw new ApiError(400, 'This invitation is for your partner. Share the link or code with them.');
+    if (await pairingBlocked(ctx.userId, row.inviter_id)) {
+      throw new ApiError(403, 'You can’t reconnect with this person. A block is in place.');
+    }
     const ownMembers = await database.prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n: number}>();
     if ((ownMembers?.n || 0) > 1) throw new ApiError(409, 'Disconnect your current couple space before joining another.');
     const partner = await database.prepare('SELECT profile_json FROM users WHERE id = ?').bind(row.inviter_id).first<{profile_json: string}>();

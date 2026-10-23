@@ -16,7 +16,7 @@ export default function TermsPage() {
       <h2>Your account</h2>
       <p>You must be old enough to use the internet in your country. Keep your password secret. You are responsible for content you upload. Do not use LoveLink to harass anyone, share others’ private media without permission, or break the law.</p>
       <h2>Couples</h2>
-      <p>A couple space holds at most two linked accounts. Invitations expire after seven days and can be cancelled. Either partner may disconnect. After disconnect, content you created moves with you; your former partner keeps theirs.</p>
+      <p>A couple space holds at most two linked accounts. Invitations expire after seven days and can be cancelled. Either partner may disconnect or block the other. Blocking unlinks immediately and stops those two accounts from pairing again until the blocker unblocks. After disconnect or block, content you created moves with you; your former partner keeps theirs.</p>
       <h2>Availability</h2>
       <p>We aim to keep the site available, but hosting, database, and email outages can happen. LoveLink is provided as-is. Background reminders need a configured notification gateway.</p>
       <h2>Changes</h2>

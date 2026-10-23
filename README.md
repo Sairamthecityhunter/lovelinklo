@@ -104,7 +104,7 @@ Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unch
 
 1. In the Vercel project **lovelinklos**, set Git to deploy this branch (not `main`).
 2. Add `DATABASE_URL`, `AUTH_SECRET`, and `APP_URL`. Optionally `RESEND_API_KEY` and `EMAIL_FROM` for password-reset email.
-3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000` and `0001`).
+3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`, `0001`, and `0002`).
 4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
 5. Confirm `/register`, `/us` invite+accept, and creating a wish pin survive a reload.
 
@@ -124,7 +124,7 @@ pnpm dev
 
 - `node --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, and D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases).
 - `pnpm exec tsc --noEmit`: typed application and route checks.
-- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, and a third user denied access. Test identities are synthetic.
+- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, and partner block/report (unlink, rejected re-pair both ways, flagged report). Test identities are synthetic.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
 
 Two structured browser tools are included: `list_love_pins` (read only) and `start_love_pin` (opens the editor without saving). Inputs are validated and outputs use the same visible state as the interface.

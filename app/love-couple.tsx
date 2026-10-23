@@ -1,7 +1,9 @@
 'use client';
 import {useEffect,useState,type FormEvent,type ReactNode} from 'react';
-import {CalendarDays,Lock,MessageCircleHeart,Sparkles,Trash2} from 'lucide-react';
+import {CalendarDays,Lock,MessageCircleHeart,ShieldAlert,Sparkles,Trash2} from 'lucide-react';
 import {toast} from 'sonner';
+import {AlertDialog,AlertDialogCancel,AlertDialogContent,AlertDialogDescription,AlertDialogFooter,AlertDialogHeader,AlertDialogTitle} from '@/components/ui/alert-dialog';
+import {REPORT_REASONS} from '@/lib/report-reasons';
 import {countdown,dateLabel,nextEventDate} from '@/lib/love-time';
 import {CHECKIN_MOODS} from '@/lib/daily-prompt';
 import type {Goal,LoveEvent,LoveState,Memory,View} from '@/lib/love-types';
@@ -40,6 +42,164 @@ const MOOD_LABEL: Record<string,string> = {
   grateful:'Grateful',
 };
 
+type SafetyPayload = {
+  connected:boolean;
+  partner:{userId:string;name:string}|null;
+  canBlock:boolean;
+  canReport:boolean;
+  reportTarget:{name:string}|null;
+  blocked:Array<{userId:string;name:string;createdAt:string}>;
+};
+
+async function safetyRequest(body?: Record<string, unknown>) {
+  const r = await fetch('/api/safety', {
+    method: body ? 'POST' : 'GET',
+    cache: 'no-store',
+    headers: body ? {'Content-Type': 'application/json'} : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json() as SafetyPayload & {error?: string; confirmation?: string; reported?: boolean; blocked?: boolean};
+  if (!r.ok) throw new Error(data.error || 'Could not update safety settings.');
+  return data;
+}
+
+export function BlockedPartnersList() {
+  const [blocked, setBlocked] = useState<SafetyPayload['blocked']>([]);
+  const [busy, setBusy] = useState('');
+  useEffect(() => {
+    void safetyRequest().then((data) => setBlocked(data.blocked)).catch(() => {});
+  }, []);
+  if (!blocked.length) return null;
+  return (
+    <div className="setting-row">
+      <div>
+        <strong>Blocked accounts</strong>
+        <p>Unblocking does not reconnect you. They stay in their own space until you both pair again.</p>
+        <ul className="blocked-list">
+          {blocked.map((row) => (
+            <li key={row.userId}>
+              <span>{row.name}</span>
+              <button
+                className="outline-button"
+                disabled={busy === row.userId}
+                onClick={() => {
+                  setBusy(row.userId);
+                  void safetyRequest({op: 'unblock', userId: row.userId})
+                    .then((data) => {setBlocked(data.blocked); toast.success('Unblocked. You are not paired again.');})
+                    .catch((e) => toast.error((e as Error).message))
+                    .finally(() => setBusy(''));
+                }}
+              >Unblock</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function PartnerSafetyCard({
+  partnerName,
+  canBlock,
+  canReport,
+  reportTargetName,
+  signedIn,
+  onChanged,
+}:{
+  partnerName:string;
+  canBlock:boolean;
+  canReport:boolean;
+  reportTargetName:string;
+  signedIn:boolean;
+  onChanged:()=>void;
+}) {
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [reason, setReason] = useState('');
+  const [details, setDetails] = useState('');
+  const [alsoBlock, setAlsoBlock] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState('');
+  if (!canBlock && !canReport) return null;
+  return (
+    <section className="card couple-safety-card">
+      <div className="section-title">
+        <div>
+          <h2>Partner settings</h2>
+          <p>Block or report {reportTargetName || partnerName || 'your partner'}. Reports stay private to the site operator.</p>
+        </div>
+      </div>
+      {canBlock && (
+        <div className="safety-actions">
+          <button className="danger-button" disabled={!signedIn || busy} onClick={() => setConfirmBlock(true)}>
+            <ShieldAlert size={16}/>Block {partnerName || 'partner'}
+          </button>
+          <p className="help-text">Blocking unlinks you immediately. They lose access to this shared space, and you cannot pair again until you unblock them in Settings.</p>
+        </div>
+      )}
+      {canReport && (
+        confirmation ? (
+          <p className="safety-confirmation" role="status">{confirmation}</p>
+        ) : (
+          <form className="love-form safety-report" onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            setBusy(true);
+            void safetyRequest({op: 'report', reason, details: details.trim(), alsoBlock})
+              .then((data) => {
+                setConfirmation(data.confirmation || 'We received your report. They will not be told that you reported them.');
+                toast.success(data.confirmation || 'Report sent.');
+                setReason('');
+                setDetails('');
+                setAlsoBlock(false);
+                onChanged();
+              })
+              .catch((err) => toast.error((err as Error).message))
+              .finally(() => setBusy(false));
+          }}>
+            <label>Reason
+              <select required value={reason} onChange={(e) => setReason(e.target.value)}>
+                <option value="">Choose a reason</option>
+                {REPORT_REASONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </label>
+            <label>Details<textarea required minLength={1} maxLength={2000} value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What happened? They will not see this."/></label>
+            {canBlock && (
+              <label className="safety-check">
+                <input type="checkbox" checked={alsoBlock} onChange={(e) => setAlsoBlock(e.target.checked)}/>
+                Also block {partnerName || 'this person'}
+              </label>
+            )}
+            <button className="outline-button" disabled={busy || !signedIn || !reason || !details.trim()}>Submit report</button>
+          </form>
+        )
+      )}
+      <AlertDialog open={confirmBlock} onOpenChange={setConfirmBlock}>
+        <AlertDialogContent className="love-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block {partnerName || 'your partner'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This unlinks you now. They lose access to shared notes, memories, and check-ins. You cannot pair with them again until you unblock them. Unblocking does not reconnect you.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep linked</AlertDialogCancel>
+            <button className="danger-button" disabled={busy} onClick={() => {
+              setBusy(true);
+              void safetyRequest({op: 'block'})
+                .then(() => {
+                  toast.success('They are blocked and unlinked.');
+                  setConfirmBlock(false);
+                  onChanged();
+                })
+                .catch((err) => toast.error((err as Error).message))
+                .finally(() => setBusy(false));
+            }}>Block and unlink</button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
+}
+
 export function OurSpaceView({
   state,
   now,
@@ -47,6 +207,7 @@ export function OurSpaceView({
   onMemory,
   onInvite,
   onNavigate,
+  onReload,
 }:{
   state:LoveState;
   now:number;
@@ -54,8 +215,10 @@ export function OurSpaceView({
   onMemory:(m:Memory)=>void;
   onInvite:()=>void;
   onNavigate:(view:View)=>void;
+  onReload?:()=>void;
 }) {
   const [couple,setCouple]=useState<CouplePayload|null>(null);
+  const [safety,setSafety]=useState<SafetyPayload|null>(null);
   const [note,setNote]=useState('');
   const [mood,setMood]=useState('grateful');
   const [answer,setAnswer]=useState('');
@@ -64,10 +227,14 @@ export function OurSpaceView({
 
   async function load() {
     if (!signedIn) return;
-    const r = await fetch('/api/couple', {cache: 'no-store'});
+    const [r, next] = await Promise.all([
+      fetch('/api/couple', {cache: 'no-store'}),
+      safetyRequest().catch(() => null),
+    ]);
     const data = await r.json() as CouplePayload & {error?: string};
     if (!r.ok) throw new Error(data.error || 'Could not open your shared space.');
     setCouple(data);
+    if (next) setSafety(next);
   }
 
   useEffect(() => {
@@ -256,6 +423,14 @@ export function OurSpaceView({
           )) : <p className="help-text">Add a dream on Plans. Leave it shared so it appears here for both of you.</p>}
         </section>
       </div>
+      <PartnerSafetyCard
+        partnerName={couple?.partner?.name || state.profile.partnerName}
+        canBlock={safety?.canBlock ?? connected}
+        canReport={safety?.canReport ?? connected}
+        reportTargetName={safety?.reportTarget?.name || couple?.partner?.name || state.profile.partnerName}
+        signedIn={signedIn}
+        onChanged={() => {void load(); onReload?.();}}
+      />
     </>
   );
 }

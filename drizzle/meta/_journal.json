@@ -15,6 +15,13 @@
       "when": 1792759232427,
       "tag": "0001_silly_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792791633061,
+      "tag": "0002_partner_safety",
+      "breakpoints": true
     }
   ]
 }

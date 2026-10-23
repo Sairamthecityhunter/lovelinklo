@@ -46,6 +46,13 @@ body .love-dialog{border-radius:24px!important;border:1px solid var(--border);bo
 .timeline-memory,.timeline-note{display:flex;gap:14px;align-items:center;text-align:left;width:100%;padding:10px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
 .timeline-memory img,.timeline-memory video{width:72px;height:72px;object-fit:cover;border-radius:12px}
 .couple-empty{padding:24px;text-align:center;color:var(--muted-foreground)}
+.couple-safety-card{margin-top:22px}
+.safety-actions{display:grid;gap:8px;margin-bottom:18px}
+.safety-report select{width:100%;border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--card);color:var(--foreground)}
+.safety-check{display:flex;align-items:center;gap:10px;font-size:14px}
+.safety-confirmation{background:var(--secondary);border-radius:14px;padding:14px 16px}
+.blocked-list{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:10px}
+.blocked-list li{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .invite-code-field{display:grid;gap:8px;margin:16px 0;font-size:14px;font-weight:600}
 .invite-code-field input{border:1px solid var(--border);border-radius:10px;padding:12px;font:inherit;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:767px){
