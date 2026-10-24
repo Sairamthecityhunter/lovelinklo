@@ -13,8 +13,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate-postgres.mjs",
-    "test:unit": "node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/couple-trips.test.mjs tests/gift-orders.test.mjs",
-    "test:e2e": "node tests/postgres-auth.e2e.mjs && node tests/couple-space.e2e.mjs && node tests/partner-safety.e2e.mjs && node tests/push-reminders.e2e.mjs && node tests/couple-trips.e2e.mjs && node tests/gift-orders.e2e.mjs"
+    "test:unit": "node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/couple-trips.test.mjs tests/gift-orders.test.mjs tests/ops-dashboard.test.mjs",
+    "test:e2e": "node tests/postgres-auth.e2e.mjs && node tests/couple-space.e2e.mjs && node tests/partner-safety.e2e.mjs && node tests/push-reminders.e2e.mjs && node tests/couple-trips.e2e.mjs && node tests/gift-orders.e2e.mjs && node tests/ops-dashboard.e2e.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
