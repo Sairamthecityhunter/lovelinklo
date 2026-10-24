@@ -328,6 +328,67 @@ body{overflow-x:clip}
  .ops-foot{flex-direction:column;align-items:flex-start}
  .ops-gate-card .primary-button,
  .ops-gate-card .outline-button{width:100%;justify-content:center}
+ .ops-top-links .outline-button{min-height:44px}
+ .ops-list li{overflow-wrap:anywhere}
+
+ /* Editors, settings, calendar, gift order, errors — beat later-loaded CSS. */
+ body .form-grid,
+ body .form-grid.triple{grid-template-columns:1fr}
+ body .button-row{flex-direction:column;align-items:stretch;gap:10px}
+ body .button-row>*{width:100%;justify-content:center;min-height:44px}
+ .page-heading .button-row{width:100%}
+ .setting-row,
+ .toggle-row{flex-direction:column;align-items:stretch}
+ .setting-row>button,
+ .setting-row>a,
+ .setting-row>.outline-button,
+ .setting-row>.primary-button,
+ .setting-row>.icon-button,
+ .setting-row>.text-button,
+ .setting-row>.button-row{margin-left:0;width:100%;justify-content:center}
+ .invite-link{flex-wrap:wrap;gap:8px}
+ .invite-link input{min-width:0;flex:1 1 180px;font-size:16px;min-height:44px}
+ .calendar-toolbar,
+ .emoji-calendar .calendar-toolbar{flex-wrap:wrap}
+ .emoji-calendar .calendar-toolbar h2{white-space:normal}
+ .calendar-day-item{min-height:48px;align-items:center}
+ .calendar-emoji-key{flex-wrap:wrap}
+ body .shop-grid,
+ body .shop-received-grid,
+ body .love-shop .shop-grid,
+ body .love-shop .shop-received-grid{grid-template-columns:1fr}
+ body .together-layout aside,
+ body .together-form-grid,
+ body .gift-kind-grid{grid-template-columns:1fr}
+ body .together-tabs,
+ .gift-center .together-tabs,
+ body .seller-tabs{display:flex;flex-wrap:wrap;width:100%;overflow:visible}
+ body .together-tabs [data-slot=tabs-trigger],
+ .gift-center .together-tabs [data-slot=tabs-trigger],
+ body .seller-tabs [data-slot=tabs-trigger],
+ body .seller-tabs button{flex:1 1 140px;min-height:44px;white-space:normal}
+ .couple-games-tabs[data-slot=tabs-list]{grid-template-columns:1fr 1fr}
+ [data-slot=alert-dialog-footer]{flex-direction:column-reverse;align-items:stretch;gap:10px}
+ [data-slot=alert-dialog-footer]>button,
+ [data-slot=alert-dialog-footer]>a{width:100%;min-height:44px}
+ .error-article .button-row a,
+ .error-article .button-row button{width:100%;justify-content:center}
+ .welcome-note>button{min-height:44px;width:100%;justify-content:center}
+ .legal-nav-signin{min-height:44px}
+ .filter-chips{flex-wrap:wrap}
+ .filter-chips button{flex:1 1 auto}
+ .note-compose textarea,
+ .love-form input:not([type=checkbox]),
+ .love-form textarea,
+ .love-form select{font-size:16px}
+ body .world-camera-controls button{min-width:44px;min-height:44px}
+ body .world-direction-pad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px)}
+ .seller-submit{flex-wrap:wrap}
+ .seller-submit .seller-primary{width:100%}
+ .seller-check{align-items:flex-start;min-height:44px}
+ .marketplace-order .button-row,
+ .gift-center .seller-form .button-row,
+ .together-panel .button-row{flex-direction:column;align-items:stretch}
 }
 
 @media(max-width:479px){
