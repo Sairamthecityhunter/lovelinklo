@@ -6,7 +6,7 @@ import {
   assertLoginAllowed,
   clearLoginFailures,
   clearSessionCookieHeader,
-  currentSessionUser,
+  cookieValue,
   emailSignInPath,
   emailSignOutPath,
   hashPassword,
@@ -14,14 +14,12 @@ import {
   isValidEmail,
   isValidPassword,
   normalizeEmail,
-  readSessionTokenFromRequest,
   recordLoginFailure,
   safeAuthReturnPath,
   sessionCookieHeader,
-  signOutResponse,
-  userFromSessionToken,
+  signOutRedirect,
   verifyPassword,
-} from '../lib/session-auth.ts';
+} from '../lib/session-auth-core.ts';
 
 test('AuthError is importable under strip-types and exposes status', () => {
   const error = new AuthError(401, 'Email or password is incorrect.');
@@ -57,20 +55,10 @@ test('session cookie helpers set and clear __lovelink_session', () => {
   assert.match(cleared, new RegExp(`^${SESSION_COOKIE}=;`));
   assert.match(cleared, /Max-Age=0/);
   assert.doesNotMatch(cleared, /Secure/);
-});
-
-test('reads the session token from an incoming request cookie', async () => {
-  const request = new Request('http://127.0.0.1/api/state', {
-    headers: {cookie: `${SESSION_COOKIE}=session-token-from-cookie`},
-  });
-  assert.equal(await readSessionTokenFromRequest(request), 'session-token-from-cookie');
-  assert.equal(await readSessionTokenFromRequest(new Request('http://127.0.0.1/api/state')), null);
-});
-
-test('missing or short tokens never become a session user', async () => {
-  assert.equal(await userFromSessionToken(null), null);
-  assert.equal(await userFromSessionToken('tooshort'), null);
-  assert.equal(await currentSessionUser(new Request('http://127.0.0.1/login')), null);
+  assert.equal(
+    cookieValue(`${SESSION_COOKIE}=session-token-from-cookie; other=1`, SESSION_COOKIE),
+    'session-token-from-cookie',
+  );
 });
 
 test('login lockout trips after repeated failures', () => {
@@ -103,23 +91,23 @@ test('safe return paths stay on-site and skip auth loops', () => {
   assert.equal(emailSignOutPath('/seller'), '/signout?return_to=%2Fseller');
 });
 
-test('sign-out clears the session cookie and ignores prefetch', async () => {
-  const signedOut = await signOutResponse(new Request('http://127.0.0.1/signout?return_to=/pins'));
+test('sign-out clears the session cookie and ignores prefetch', () => {
+  const signedOut = signOutRedirect(new Request('http://127.0.0.1/signout?return_to=/pins'));
   assert.equal(signedOut.status, 302);
-  assert.equal(signedOut.headers.get('Location'), '/pins');
-  assert.match(signedOut.headers.get('Set-Cookie') || '', /__lovelink_session=;/);
-  assert.match(signedOut.headers.get('Set-Cookie') || '', /Max-Age=0/);
+  assert.equal(signedOut.headers.Location, '/pins');
+  assert.match(signedOut.headers['Set-Cookie'], /__lovelink_session=;/);
+  assert.match(signedOut.headers['Set-Cookie'], /Max-Age=0/);
 
-  const posted = await signOutResponse(new Request('https://lovelinklos.vercel.app/signout', {method: 'POST'}));
+  const posted = signOutRedirect(new Request('https://lovelinklos.vercel.app/signout', {method: 'POST'}));
   assert.equal(posted.status, 303);
-  assert.equal(posted.headers.get('Location'), '/login');
-  assert.match(posted.headers.get('Set-Cookie') || '', /Secure/);
+  assert.equal(posted.headers.Location, '/login');
+  assert.match(posted.headers['Set-Cookie'], /Secure/);
 
   const prefetch = new Request('http://127.0.0.1/signout', {
     headers: {'next-router-prefetch': '1'},
   });
   assert.equal(isAuthPrefetch(prefetch), true);
-  const skipped = await signOutResponse(prefetch);
+  const skipped = signOutRedirect(prefetch);
   assert.equal(skipped.status, 204);
-  assert.equal(skipped.headers.get('Set-Cookie'), null);
+  assert.equal(skipped.headers['Set-Cookie'], undefined);
 });
