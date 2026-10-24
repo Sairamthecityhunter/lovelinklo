@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env} from '@/lib/cf-env';
 import {z} from 'zod';
 import {ensureUser,db,guard,jsonBody,response,failure,ApiError} from '@/lib/server';
 import {sessionFor,snapshot,type WorldSession} from '@/lib/world-server';

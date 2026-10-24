@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {BrandLogo} from './brand-logo';
+import {SiteFooter} from './site-footer';
 
 export function WelcomePage(){
  return (
@@ -49,10 +50,7 @@ export function WelcomePage(){
     <Link className="primary-button" href="/register">Get started</Link>
    </section>
 
-   <footer className="landing-footer">
-    <span>lovelink.io</span>
-    <Link href="/seller">Sellers</Link>
-   </footer>
+   <SiteFooter/>
   </div>
  );
 }

@@ -7,11 +7,14 @@
   },
   "scripts": {
     "install:ci": "bash scripts/install-pnpm.sh",
-    "dev": "node scripts/run-framework.mjs dev",
-    "build": "node scripts/run-framework.mjs build",
-    "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate-postgres.mjs",
+    "test:unit": "node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/couple-trips.test.mjs tests/gift-orders.test.mjs",
+    "test:e2e": "node tests/postgres-auth.e2e.mjs && node tests/couple-space.e2e.mjs && node tests/partner-safety.e2e.mjs && node tests/push-reminders.e2e.mjs && node tests/couple-trips.e2e.mjs && node tests/gift-orders.e2e.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -27,6 +30,7 @@
     "lucide-react": "^1.31.0",
     "next": "16.3.4",
     "next-themes": "^0.4.6",
+    "pg": "^8.16.3",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",
     "react-day-picker": "^10.0.1",
@@ -38,16 +42,20 @@
     "tailwind-merge": "3.6.0",
     "three": "^0.186.0",
     "vaul": "^1.1.2",
+    "web-push": "^3.6.7",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@neondatabase/serverless": "^1.2.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/pg": "^8.15.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/three": "^0.186.0",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
@@ -59,7 +67,8 @@
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.5",
     "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "wrangler": "4.92.0",
+    "ws": "^8.22.0"
   },
   "type": "module",
   "overrides": {

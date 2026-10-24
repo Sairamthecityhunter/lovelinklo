@@ -1,21 +1,27 @@
-import {env} from 'cloudflare:workers';
-import {SCHEMA_STATEMENTS} from './schema-bootstrap';
+import {env} from '@/lib/cf-env';
 
 let ready:Promise<void>|null=null;
 
 export async function ensureLocalSchema(){
- if(!env.DB)return;
+ const database=env.DB;
+ if(!database)return;
  if(!ready)ready=(async()=>{
-  const users=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").first();
-  if(!users){
-   for(const sql of SCHEMA_STATEMENTS)await env.DB.prepare(sql).run();
-   return;
-  }
-  const auth=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='auth_accounts'").first();
-  if(auth)return;
-  for(const sql of SCHEMA_STATEMENTS){
-   if(sql.includes('auth_accounts')||sql.includes('auth_sessions'))await env.DB.prepare(sql).run();
-  }
+  const users=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'").first();
+  if(!users)throw new Error('Database schema is missing. Run `pnpm db:migrate` (or `npm run db:migrate`) against DATABASE_URL.');
+  const auth=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'auth_accounts'").first();
+  if(!auth)throw new Error('Auth tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const extras=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'couple_notes'").first();
+  if(!extras)throw new Error('Couple tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const safety=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'partner_blocks'").first();
+  if(!safety)throw new Error('Safety tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const push=await database.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'push_subscriptions' AND column_name = 'endpoint'").first();
+  if(!push)throw new Error('Push tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const unlocks=await database.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'couple_notes' AND column_name = 'status'").first();
+  if(!unlocks)throw new Error('Closeness unlock columns are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const trips=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'couple_trips'").first();
+  if(!trips)throw new Error('Couple trip tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const giftOrders=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'gift_orders'").first();
+  if(!giftOrders)throw new Error('Gift order tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
  })().catch(e=>{ready=null;throw e;});
  await ready;
 }

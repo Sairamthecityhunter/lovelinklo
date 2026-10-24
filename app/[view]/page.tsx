@@ -5,7 +5,9 @@ import type {View} from '@/lib/love-types';
 
 export const dynamic='force-dynamic';
 
-const views=['home','pins','calendar','gifts','wishlist','memories','letters','plans','surprises','settings','about','games','world','shop','concierge','together'] as const;
+const views=['home','us','pins','calendar','gifts','wishlist','memories','letters','plans','surprises','settings','about','games','world','shop','concierge','together'] as const;
+
+export const metadata={robots:{index:false,follow:false}};
 
 export default async function Page({params}:{params:Promise<{view:string}>}){
  const {view}=await params;

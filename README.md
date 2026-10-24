@@ -5,6 +5,7 @@ A working couples website and installable progressive web app. Love Wish Pins ar
 ## Product structure
 
 - `/`: private couple dashboard, both clocks, relationship duration, Don't Forget card, live countdown, active wishes, gift ideas, recent memory, and upcoming dates.
+- `/us`: shared couple space — invite/code pairing, love notes, shared photo timeline, anniversary countdown, bucket list, and a daily mood check-in that stays hidden from your partner until you answer.
 - `/pins`: create/edit/delete wishes; all ten types; 13 preset offsets; custom days/hours/minutes; recurrence; secret mode; search; completed/recurring views; snooze; notification actions.
 - `/calendar`: month navigation, birthdays and annual events, all pinned tasks, linked wishes, and occasion planning.
 - `/gifts`: searchable sample products and experiences, budget/delivery-date filters, gift guide, wishlist actions, delivery estimates, demo checkout, and saved demo orders.
@@ -19,7 +20,9 @@ A working couples website and installable progressive web app. Love Wish Pins ar
 
 ## Architecture
 
-The app uses TypeScript, React 19, the Next.js App Router API through Vinext, Tailwind CSS, and the bundled Radix/Shadcn primitives. It runs as an ESM Cloudflare Worker. This deployment uses managed SQLite/D1 and Drizzle instead of the brief's suggested PostgreSQL/Prisma stack, so it is fully compatible with the hosting environment. Object storage holds private uploaded images. No personal record uses browser storage as its source of truth.
+The app uses TypeScript, React 19, the Next.js App Router, Tailwind CSS, and the bundled Radix/Shadcn primitives. This branch runs on Vercel’s Node.js runtime with a standard Postgres database (Neon or Vercel Marketplace Postgres) through `DATABASE_URL`. Drizzle owns the schema and migrations. Uploaded media is stored as `bytea` rows in Postgres (`media_blobs`), so no Cloudflare R2/KV/D1 bindings are required. Sessions are hashed with `AUTH_SECRET` and stored in `auth_sessions`. No personal record uses browser storage as its source of truth.
+
+The original Cloudflare Worker / D1 deployment remains on the default branch for the `lovelinklo` project. Do not merge this branch there.
 
 Server handlers check the dispatch-provided authenticated user on every account API. The live website is initially owner-private. The anonymous local preview explicitly uses an in-memory example couple; refreshing that demo resets it. Signed-in users receive a durable starter dataset on first use and can personalize the profile or clear the example content.
 
@@ -30,6 +33,9 @@ The main UI and forms are in `app/lovelink.tsx`, `app/love-forms.tsx`, and `app/
 | Route | Behavior |
 | --- | --- |
 | GET `/api/state` | Authenticated, privacy-filtered couple state |
+| GET/POST `/api/couple` | Linked-partner notes and daily check-ins (scoped to `couple_id`) |
+| GET/POST `/api/invite` | Create, cancel, or accept a partner invite (link or 8-character code) |
+| POST `/api/auth/forgot` `/api/auth/reset` | Password reset request and token consumption |
 | POST `/api/state` | Validated record/profile changes, completion, snooze, inbox generation, thinking-of-you, clear, disconnect and account deletion |
 | POST `/api/invite` | Create a seven-day, hashed, single-use invitation or atomically accept it |
 | POST `/api/media` | Validate media signatures and size, store private bytes and ownership metadata |
@@ -78,19 +84,51 @@ This is a functional first version with production-oriented authorization and pe
 - **Partner access:** the invitation flow is implemented and tested. A second person needs Site audience access as well as an invitation; publishing does not widen the audience automatically. Share settings must be changed explicitly by the owner.
 - **Future expansion:** recap video export, digital gift-card fulfillment and physical tracking inside surprise boxes, Google Calendar synchronization, third-party booking/search, QR invitations, granular wishlist sizing/favorites, and native app-store packages remain follow-on work. Their associated integration data models are included where applicable, but no UI claims that those services are live.
 
-`.env.example` lists every optional secret. Never commit `.env` or a real key. The logical `DB` and `BUCKET` bindings live in `.openai/hosting.json`; hosting owns actual resources.
+`.env.example` lists every required and optional secret. Never commit `.env`, `.env.local`, or a real key.
+
+### Required environment variables (Vercel / Node)
+
+Set these on the `lovelinklos` Vercel project (Production and Preview):
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Postgres connection string (Neon pooled URL recommended). `POSTGRES_URL` is accepted as an alias. |
+| `AUTH_SECRET` | Random 32+ character secret used to hash session tokens. `SESSION_SECRET` is an optional alias. Generate with `openssl rand -base64 48`. |
+| `APP_URL` | Public origin for invite links, password-reset emails, sitemap, and Open Graph. Example: `https://lovelinklos.vercel.app`. Optional locally. |
+| `RESEND_API_KEY` | Optional. With `EMAIL_FROM`, sends password-reset email. Forgot-password still works without it, but no email is delivered. |
+| `EMAIL_FROM` | Optional verified sender for Resend, e.g. `LoveLink <hello@yourdomain.com>`. |
+| `VAPID_PUBLIC_KEY` | Optional. Web Push public key. If any VAPID value is unset, LoveLink skips sending and does not error. |
+| `VAPID_PRIVATE_KEY` | Optional. Web Push private key. |
+| `VAPID_SUBJECT` | Optional. `mailto:` or `https:` contact used as the VAPID subject. |
+| `CRON_SECRET` | Protects `GET`/`POST` `/api/cron/reminders`. Vercel Cron sends it as `Authorization: Bearer`. |
+
+Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unchanged. Web Push uses `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` when set; if any are missing, LoveLink skips sending and does not error. The hourly special-day job at `/api/cron/reminders` requires `CRON_SECRET`. After provisioning the database, apply schema with `pnpm db:migrate` (or `npm run db:migrate`) using that `DATABASE_URL`. Vercel does not apply migrations automatically.
+
+### Deploying `lovelinklos` from this branch
+
+1. In the Vercel project **lovelinklos**, set Git to deploy this branch (not `main`).
+2. Add `DATABASE_URL`, `AUTH_SECRET`, and `APP_URL`. Optionally `RESEND_API_KEY` and `EMAIL_FROM` for password-reset email.
+3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`, `0001`, `0002`, `0003`, and `0004`).
+4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
+5. Confirm `/register`, `/us` invite+accept, and creating a wish pin survive a reload.
 
 ## Development
 
-Use Node.js 22.13+ (Node.js 24 supports the type-stripping test runner). Preserve `pnpm-lock.yaml` and the declared package manager. Run `pnpm install`, `pnpm dev`, and `pnpm build` in a standalone environment. The portable development profile supports loopback-only development authentication; production authentication is provided by the hosting dispatcher. When using the Sites plugin, use its setup/build/preview/publishing helpers rather than starting another server.
+Use Node.js 22.13+. Preserve `pnpm-lock.yaml` and the declared package manager. Create a local Postgres database, copy `.env.example` to `.env.local`, set `DATABASE_URL` and `AUTH_SECRET`, then:
 
-After a schema edit: generate a new migration with `pnpm db:generate`, inspect its SQL, and apply each pending migration to the local D1 before authenticated preview testing. Publication applies the packaged production migrations.
+```bash
+pnpm install
+pnpm db:migrate
+pnpm dev
+```
+
+`pnpm build` / `next build` produce the Vercel production bundle. `pnpm start` / `next start` serve it. After a schema edit, generate a new Postgres migration with `pnpm db:generate`, inspect the SQL, and apply it with `pnpm db:migrate`.
 
 ### Validation
 
-- `node --test tests/love-time.test.mjs tests/love-extras.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, and timezone conversion, DST gaps/overlaps, recurrence through DST/month ends, custom offsets, snooze and countdown thresholds.
+- `pnpm test:unit` or `node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases), and closeness unlock rules (100/50/25 notes, calendar, and push).
 - `pnpm exec tsc --noEmit`: typed application and route checks.
-- After a build, `node --import ./scripts/sites-env.mjs tests/api.test.mjs`: the actual compiled Worker in an isolated Miniflare database. Covers auth, durable CRUD, validation, two-user isolation, shared/private records, invitation atomicity and reuse, delayed letter visibility, snooze, idempotent notifications, missing-provider behavior, cross-site rejection, scheduled surprise JSON/media access, cross-user media attachment rejection, unsafe playlist URLs, mismatched media types, streaming ranges and privacy revocation. Test identities and data are synthetic; tests do not call external providers or production.
+- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, partner block/report (unlink, rejected re-pair both ways, flagged report), and push/closeness/special-day reminders (subscribe/unsubscribe, note targeting, draft/send gating, calendar unlocks, scheduled notes, reminder timing, cron dedupe and auth, quiet block cleanup). Test identities are synthetic. Soft closeness decay after quiet days is intentionally left as follow-up work.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
 
 Two structured browser tools are included: `list_love_pins` (read only) and `start_love_pin` (opens the editor without saving). Inputs are validated and outputs use the same visible state as the interface.
@@ -101,7 +139,7 @@ Assets are local and optimized. Source URLs, photographers and reuse labels are 
 
 ## Date Concierge and business features
 
-`/concierge` provides curated date plans with a budget split, timezone-aware itinerary, saved checklist, calendar event and four linked reminders, plus text itinerary export. Plans and private drafts persist in `concierge_records`. Calendar insertion is a single D1 batch with deterministic IDs, so retries cannot duplicate its event or pins. Checklist completion and Love Pin completion are separate controls. Created calendar entries remain after deleting a plan.
+`/concierge` provides curated date plans with a budget split, timezone-aware itinerary, saved checklist, calendar event and four linked reminders, plus text itinerary export. Plans and private drafts persist in `concierge_records`. Calendar insertion is a single database transaction with deterministic IDs, so retries cannot duplicate its event or pins. Checklist completion and Love Pin completion are separate controls. Created calendar entries remain after deleting a plan.
 
 The shop includes three digital date scripts ($5.99, $7.99, $5.99). Confirmed purchases unlock their server-delivered content; active couple Premium includes all three. Refunds revoke future access. Existing downloaded content cannot be recalled. Existing Premium pricing remains $4.99/month. No real charges occur while the existing payment switch is disabled.
 

@@ -1,12 +1,28 @@
 import type {Metadata} from 'next';
+import {publicAppUrl} from '@/lib/app-url';
 import './globals.css';
 import './love-design.css';
 import './auth.css';
 
+const site=publicAppUrl();
+const description='A private couple website: pin little loves, keep memories, share a timeline, and stay close wherever you are.';
+
 export const metadata:Metadata={
- title:'LoveLink — Your little world, together',
- description:'Remember every moment. Pin a little love, plan thoughtful surprises, and stay close, wherever you are.',
+ metadataBase:new URL(site),
+ title:{default:'LoveLink — Your little world, together',template:'%s — LoveLink'},
+ description,
+ applicationName:'LoveLink',
  manifest:'/manifest.webmanifest',
+ openGraph:{
+  type:'website',
+  locale:'en_US',
+  url:site,
+  siteName:'LoveLink',
+  title:'LoveLink — Your little world, together',
+  description,
+  images:[{url:'/images/couple-sunset.jpg',width:1600,height:900,alt:'A couple together by the sea at sunset'}]
+ },
+ twitter:{card:'summary_large_image',title:'LoveLink — Your little world, together',description},
  icons:{
   icon:[
    {url:'/favicon.png',sizes:'64x64',type:'image/png'},

@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {seedState} from '@/lib/love-data';
 import type {Collection,Pin,Profile} from '@/lib/love-types';
 import {ensureAuthTables} from '@/lib/migrate-local';
+import {assertRateLimit,clientIp} from '@/lib/rate-limit';
 import {ApiError,db,failure,guard,insertRecord,jsonBody,tables} from '@/lib/server';
 import {createSession,hashPassword,isValidEmail,isValidPassword,normalizeEmail,withSessionCookie} from '@/lib/session-auth';
 
@@ -17,19 +18,21 @@ export async function POST(request:Request){
  try{
   guard(request);
   await ensureAuthTables();
+  await assertRateLimit('auth:register-ip:'+clientIp(request),8,60*60*1000);
   const body=bodySchema.parse(await jsonBody(request,4000));
+  await assertRateLimit('auth:register:'+normalizeEmail(body.email),5,60*60*1000);
   const email=normalizeEmail(body.email);
   if(!isValidEmail(email))throw new ApiError(400,'Please enter a valid email address.');
   if(!isValidPassword(body.password))throw new ApiError(400,'Password must be at least 8 characters.');
   const database=db();
   const existing=await database.prepare('SELECT user_id FROM auth_accounts WHERE email = ?').bind(email).first();
   if(existing)throw new ApiError(409,'An account with this email already exists. Please sign in.');
+  const passwordHash=await hashPassword(body.password);
   const userId=crypto.randomUUID();
   const coupleId=crypto.randomUUID();
   const now=new Date().toISOString();
   const seed=seedState();
   const profile:Profile={...seed.profile,myName:body.name.trim(),partnerName:'Your partner',sample:true};
-  const passwordHash=await hashPassword(body.password);
   const statements=[
    database.prepare('INSERT INTO couples (id, owner_id, created_at) VALUES (?, ?, ?)').bind(coupleId,userId,now),
    database.prepare('INSERT INTO users (id, couple_id, profile_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)').bind(userId,coupleId,JSON.stringify(profile),now,now),
