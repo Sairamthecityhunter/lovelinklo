@@ -36,6 +36,20 @@
       "when": 1792810514852,
       "tag": "0004_closeness_unlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792824000000,
+      "tag": "0005_travel_trips",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792824001000,
+      "tag": "0006_gift_orders",
+      "breakpoints": true
     }
   ]
 }

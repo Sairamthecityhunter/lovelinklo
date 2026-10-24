@@ -120,6 +120,30 @@ try {
   const linkedB = await asB('/api/state');
   assert.ok(linkedB.data.memories.some((item) => item.title === 'Safety pier only partners should see'));
 
+  const trip = await asA('/api/trips', {
+    method: 'POST',
+    body: {op: 'create', title: 'Safety getaway', destination: 'Hidden pier', status: 'planned', visibility: 100},
+  });
+  assert.equal(trip.status, 200, JSON.stringify(trip.data));
+  const tripId = trip.data.upcoming.find((item) => item.title === 'Safety getaway')?.id;
+  assert.ok(tripId);
+  const gift = await asA('/api/gift-orders', {
+    method: 'POST',
+    body: {
+      op: 'create',
+      productId: 'mugs',
+      recipientName: 'Maya',
+      forPartner: true,
+      addressLine1: '1 Safety Pier',
+      city: 'London',
+      postalCode: 'E1 1AA',
+      country: 'United Kingdom',
+    },
+  });
+  assert.equal(gift.status, 200, JSON.stringify(gift.data));
+  const giftId = gift.data.created?.id;
+  assert.ok(giftId);
+
   const stillC = await asC('/api/safety', {method: 'POST', body: {op: 'report', reason: 'spam', details: 'Still not their partner.'}});
   assert.equal(stillC.status, 403, JSON.stringify(stillC.data));
 
@@ -167,6 +191,21 @@ try {
   assert.equal(stateA.data.connected, false);
   assert.equal(stateB.data.connected, false);
   assert.ok(!stateB.data.memories?.some((item) => item.title === 'Safety pier only partners should see'));
+
+  const tripsA = await asA('/api/trips');
+  const tripsB = await asB('/api/trips');
+  assert.ok(!tripsA.data.upcoming?.some((item) => item.id === tripId) && !tripsA.data.past?.some((item) => item.id === tripId));
+  assert.ok(!tripsB.data.upcoming?.some((item) => item.id === tripId) && !tripsB.data.past?.some((item) => item.id === tripId));
+  const leftoverTrips = await pool.query('SELECT id FROM couple_trips WHERE id = $1', [tripId]);
+  assert.equal(leftoverTrips.rowCount, 0, 'block must silently purge couple trips');
+  const giftsA = await asA('/api/gift-orders');
+  const giftsB = await asB('/api/gift-orders');
+  assert.ok(!giftsA.data.orders?.some((item) => item.id === giftId));
+  assert.ok(!giftsB.data.orders?.some((item) => item.id === giftId));
+  const leftoverGifts = await pool.query('SELECT id FROM gift_orders WHERE id = $1', [giftId]);
+  assert.equal(leftoverGifts.rowCount, 0, 'block must silently purge couple gift orders');
+  assert.ok(!JSON.stringify(blocked.data).includes('Safety getaway'));
+  assert.ok(!JSON.stringify(safetyB.data).includes(giftId));
 
   const afterBlockC = await asC('/api/safety', {method: 'POST', body: {op: 'block'}});
   assert.equal(afterBlockC.status, 403, JSON.stringify(afterBlockC.data));

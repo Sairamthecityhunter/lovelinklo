@@ -215,6 +215,171 @@ function PartnerSafetyCard({
   );
 }
 
+type CoupleTrip = {
+  id:string;
+  title:string;
+  destination:string;
+  startDate:string|null;
+  endDate:string|null;
+  notes:string;
+  status:'idea'|'planned'|'booked'|'done';
+  visibility:100|50|25;
+  specialDayId:string|null;
+  mine:boolean;
+};
+
+function CoupleTripsCard({signedIn,partnerName}:{signedIn:boolean;partnerName:string}) {
+  const empty = {title:'',destination:'',startDate:'',endDate:'',notes:'',status:'idea' as CoupleTrip['status'],visibility:100 as 100|50|25,remind:false};
+  const [upcoming,setUpcoming]=useState<CoupleTrip[]>([]);
+  const [past,setPast]=useState<CoupleTrip[]>([]);
+  const [form,setForm]=useState(empty);
+  const [editing,setEditing]=useState<string|null>(null);
+  const [busy,setBusy]=useState(false);
+
+  async function load() {
+    const r = await fetch('/api/trips', {cache: 'no-store'});
+    const data = await r.json() as {upcoming?:CoupleTrip[];past?:CoupleTrip[];error?:string};
+    if (!r.ok) throw new Error(data.error || 'Could not load trips.');
+    setUpcoming(data.upcoming || []);
+    setPast(data.past || []);
+  }
+
+  useEffect(() => {
+    if (signedIn) void load().catch(() => {});
+  }, [signedIn]);
+
+  function reset() {
+    setEditing(null);
+    setForm(empty);
+  }
+
+  function dates(trip: CoupleTrip) {
+    if (trip.startDate && trip.endDate) return trip.startDate + ' – ' + trip.endDate;
+    if (trip.startDate) return trip.startDate + ' · open-ended';
+    return 'Open-ended';
+  }
+
+  return (
+    <section className="card couple-safety-card">
+      <div className="section-title">
+        <div>
+          <h2>Trips</h2>
+          <p>Real-world trip plans for you and {partnerName || 'your partner'}. This is separate from Travel dreams on Plans and the World travel button.</p>
+        </div>
+      </div>
+      <div className="note-list">
+        {upcoming.map((trip) => (
+          <article className="couple-note" key={trip.id}>
+            <p>{trip.title} · {trip.destination}</p>
+            <small>{dates(trip)} · {trip.status}{trip.notes ? ` · ${trip.notes}` : ''}{trip.mine ? '' : ' · shared'}</small>
+            {trip.mine && (
+              <>
+                <button className="text-button" onClick={() => {
+                  setEditing(trip.id);
+                  setForm({
+                    title: trip.title,
+                    destination: trip.destination,
+                    startDate: trip.startDate || '',
+                    endDate: trip.endDate || '',
+                    notes: trip.notes,
+                    status: trip.status,
+                    visibility: trip.visibility,
+                    remind: !!trip.specialDayId,
+                  });
+                }}>Edit</button>
+                <button className="icon-button" aria-label="Remove trip" disabled={busy} onClick={() => {
+                  setBusy(true);
+                  void fetch('/api/trips', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({op: 'delete', id: trip.id})})
+                    .then(async (r) => {
+                      const data = await r.json() as {upcoming?:CoupleTrip[];past?:CoupleTrip[];error?:string};
+                      if (!r.ok) throw new Error(data.error || 'Could not remove that trip.');
+                      setUpcoming(data.upcoming || []);
+                      setPast(data.past || []);
+                      toast.success('Trip removed.');
+                    })
+                    .catch((e) => toast.error((e as Error).message))
+                    .finally(() => setBusy(false));
+                }}><Trash2 size={14}/></button>
+              </>
+            )}
+          </article>
+        ))}
+        {!upcoming.length && <p className="help-text">No upcoming trips yet. Add a destination you both want to plan.</p>}
+      </div>
+      {!!past.length && (
+        <div className="note-list">
+          <p className="help-text">Past trips</p>
+          {past.map((trip) => (
+            <div className="date-row" key={'past-'+trip.id}>
+              <strong>{trip.title}</strong>
+              <span>{trip.destination} · {dates(trip)} · {trip.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <form className="love-form" onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        setBusy(true);
+        void fetch('/api/trips', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            op: editing ? 'update' : 'create',
+            id: editing || undefined,
+            title: form.title.trim(),
+            destination: form.destination.trim(),
+            startDate: form.startDate || null,
+            endDate: form.endDate || null,
+            notes: form.notes.trim(),
+            status: form.status,
+            visibility: form.visibility,
+            remind: form.remind,
+          }),
+        }).then(async (r) => {
+          const data = await r.json() as {upcoming?:CoupleTrip[];past?:CoupleTrip[];error?:string};
+          if (!r.ok) throw new Error(data.error || 'Could not save that trip.');
+          setUpcoming(data.upcoming || []);
+          setPast(data.past || []);
+          reset();
+          toast.success(editing ? 'Trip updated.' : 'Trip saved.');
+        }).catch((err) => toast.error((err as Error).message)).finally(() => setBusy(false));
+      }}>
+        <label>Trip title<input required maxLength={140} value={form.title} onChange={(e) => setForm((s) => ({...s,title:e.target.value}))} placeholder="Weekend in Kyoto"/></label>
+        <label>Destination<input required maxLength={140} value={form.destination} onChange={(e) => setForm((s) => ({...s,destination:e.target.value}))} placeholder="Kyoto, Japan"/></label>
+        <div className="form-grid">
+          <label>Start date<input type="date" value={form.startDate} onChange={(e) => setForm((s) => ({...s,startDate:e.target.value}))}/></label>
+          <label>End date<input type="date" value={form.endDate} onChange={(e) => setForm((s) => ({...s,endDate:e.target.value}))}/></label>
+        </div>
+        <p className="help-text">Leave dates empty for an open-ended idea.</p>
+        <label>Notes<textarea maxLength={2000} value={form.notes} onChange={(e) => setForm((s) => ({...s,notes:e.target.value}))} placeholder="Cherry blossoms, a small ryokan, no rush."/></label>
+        <label>Status
+          <select value={form.status} onChange={(e) => setForm((s) => ({...s,status:e.target.value as CoupleTrip['status']}))}>
+            <option value="idea">Idea</option>
+            <option value="planned">Planned</option>
+            <option value="booked">Booked</option>
+            <option value="done">Done</option>
+          </select>
+        </label>
+        <label>Who can unlock this trip
+          <select value={form.visibility} onChange={(e) => setForm((s) => ({...s,visibility:Number(e.target.value) as 100|50|25}))}>
+            <option value={100}>Favorite — shared at couple level</option>
+            <option value={50}>Close and favorite</option>
+            <option value={25}>Everyone in the link</option>
+          </select>
+        </label>
+        <label className="safety-check">
+          <input type="checkbox" checked={form.remind} onChange={(e) => setForm((s) => ({...s,remind:e.target.checked}))} disabled={!form.startDate}/>
+          Pin a reminder on special days
+        </label>
+        <div className="button-row">
+          <button className="primary-button" disabled={!signedIn || busy}>{editing ? 'Save trip' : 'Add trip'}</button>
+          {editing && <button type="button" className="outline-button" onClick={reset}>Cancel</button>}
+        </div>
+      </form>
+    </section>
+  );
+}
+
 export function OurSpaceView({
   state,
   now,
@@ -508,6 +673,10 @@ export function OurSpaceView({
           )) : <p className="help-text">Add a dream on Plans. Leave it shared so it appears here for both of you.</p>}
         </section>
       </div>
+      <CoupleTripsCard
+        signedIn={signedIn}
+        partnerName={couple?.partner?.name || state.profile.partnerName}
+      />
       <PartnerNotifySettings
         signedIn={signedIn}
         partnerName={couple?.partner?.name || state.profile.partnerName}

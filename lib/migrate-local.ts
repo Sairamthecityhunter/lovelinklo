@@ -18,6 +18,10 @@ export async function ensureLocalSchema(){
   if(!push)throw new Error('Push tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
   const unlocks=await database.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'couple_notes' AND column_name = 'status'").first();
   if(!unlocks)throw new Error('Closeness unlock columns are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const trips=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'couple_trips'").first();
+  if(!trips)throw new Error('Couple trip tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const giftOrders=await database.prepare("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'gift_orders'").first();
+  if(!giftOrders)throw new Error('Gift order tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
  })().catch(e=>{ready=null;throw e;});
  await ready;
 }

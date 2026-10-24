@@ -38,6 +38,8 @@ export async function unlinkFromPartner(ctx: {userId: string; coupleId: string})
     ...Object.values(tables).map((t) => database.prepare(`UPDATE ${t} SET couple_id = ? WHERE owner_id = ?`).bind(nextCoupleId, ctx.userId)),
     database.prepare('UPDATE media SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('UPDATE couple_notes SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
+    database.prepare('UPDATE couple_trips SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
+    database.prepare('UPDATE gift_orders SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('UPDATE daily_answers SET couple_id = ? WHERE user_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(ctx.coupleId),
   ]);
@@ -55,8 +57,16 @@ export async function clearPairNotifications(a: string, b: string, coupleId?: st
     ).bind(a, b, b, a),
     database.prepare('DELETE FROM special_days WHERE (owner_user_id = ? AND person_user_id = ?) OR (owner_user_id = ? AND person_user_id = ?)').bind(a, b, b, a),
     database.prepare('DELETE FROM closeness WHERE (owner_user_id = ? AND target_user_id = ?) OR (owner_user_id = ? AND target_user_id = ?)').bind(a, b, b, a),
-    ...(coupleId ? [database.prepare('DELETE FROM couple_notes WHERE couple_id = ?').bind(coupleId)] : [
+    ...(coupleId ? [
+      database.prepare('DELETE FROM couple_notes WHERE couple_id = ?').bind(coupleId),
+      database.prepare('DELETE FROM sent_reminders WHERE special_day_id IN (SELECT special_day_id FROM couple_trips WHERE couple_id = ? AND special_day_id IS NOT NULL)').bind(coupleId),
+      database.prepare('DELETE FROM special_days WHERE id IN (SELECT special_day_id FROM couple_trips WHERE couple_id = ? AND special_day_id IS NOT NULL)').bind(coupleId),
+      database.prepare('DELETE FROM couple_trips WHERE couple_id = ?').bind(coupleId),
+      database.prepare('DELETE FROM gift_orders WHERE couple_id = ?').bind(coupleId),
+    ] : [
       database.prepare('DELETE FROM couple_notes WHERE owner_id = ? OR owner_id = ?').bind(a, b),
+      database.prepare('DELETE FROM couple_trips WHERE owner_id = ? OR owner_id = ?').bind(a, b),
+      database.prepare('DELETE FROM gift_orders WHERE owner_id = ? OR owner_id = ?').bind(a, b),
     ]),
   ]);
 }
