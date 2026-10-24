@@ -7,6 +7,7 @@ import {REPORT_REASONS} from '@/lib/report-reasons';
 import {countdown,dateLabel,nextEventDate} from '@/lib/love-time';
 import {CHECKIN_MOODS} from '@/lib/daily-prompt';
 import type {Goal,LoveEvent,LoveState,Memory,View} from '@/lib/love-types';
+import {LOCKED_NOTE_COPY,visibilityLabel} from '@/lib/closeness-unlocks';
 import {PartnerNotifySettings,SpecialDaysCard} from './love-notify';
 import {MediaView} from './love-extras';
 
@@ -17,7 +18,17 @@ function EmptyState({title,description}:{title:string;description:string}){
  return <div className="empty-state couple-empty"><h3>{title}</h3><p>{description}</p></div>;
 }
 
-type CoupleNote = {id:string;ownerId:string;body:string;createdAt:string;mine:boolean};
+type CoupleNote = {
+  id:string;
+  ownerId:string;
+  body:string;
+  createdAt:string;
+  mine:boolean;
+  status?:'draft'|'sent'|'scheduled';
+  visibility?:100|50|25;
+  sentAt?:string|null;
+  specialDayId?:string|null;
+};
 type CheckInState = {
   day:string;
   prompt:string;
@@ -31,6 +42,9 @@ type CouplePayload = {
   togetherSince:string;
   nextAnniversary:string|null;
   notes:CoupleNote[];
+  drafts?:CoupleNote[];
+  lockedNotes?:number;
+  unlocks?:{fullNotes:boolean;midNotes:boolean;everyoneNotes:boolean;loveNotePush:boolean;level:number|null};
   checkIn:CheckInState;
 };
 
@@ -221,6 +235,11 @@ export function OurSpaceView({
   const [couple,setCouple]=useState<CouplePayload|null>(null);
   const [safety,setSafety]=useState<SafetyPayload|null>(null);
   const [note,setNote]=useState('');
+  const [draftId,setDraftId]=useState<string|null>(null);
+  const [visibility,setVisibility]=useState<100|50|25>(100);
+  const [specialDayId,setSpecialDayId]=useState('');
+  const [ownDays,setOwnDays]=useState<Array<{id:string;label:string}>>([]);
+  const [noteFilter,setNoteFilter]=useState<'all'|'sent'|'received'|'drafts'>('all');
   const [mood,setMood]=useState('grateful');
   const [answer,setAnswer]=useState('');
   const [busy,setBusy]=useState(false);
@@ -228,14 +247,16 @@ export function OurSpaceView({
 
   async function load() {
     if (!signedIn) return;
-    const [r, next] = await Promise.all([
+    const [r, next, days] = await Promise.all([
       fetch('/api/couple', {cache: 'no-store'}),
       safetyRequest().catch(() => null),
+      fetch('/api/special-days', {cache: 'no-store'}).then((res) => res.ok ? res.json() : null).catch(() => null),
     ]);
     const data = await r.json() as CouplePayload & {error?: string};
     if (!r.ok) throw new Error(data.error || 'Could not open your shared space.');
     setCouple(data);
     if (next) setSafety(next);
+    if (days?.days) setOwnDays((days.days as Array<{id:string;label:string}>).map((day) => ({id: day.id, label: day.label})));
   }
 
   useEffect(() => {
@@ -253,10 +274,18 @@ export function OurSpaceView({
       });
       const data = await r.json() as CouplePayload & CoupleNote & {error?: string};
       if (!r.ok) throw new Error(data.error || 'Could not save that.');
-      if (body.op === 'note') {
-        setNote('');
-        setCouple((current) => current ? {...current, notes: [data as CoupleNote, ...current.notes]} : current);
-        toast.success('Note sent to your shared space.');
+      if (body.op === 'note' || body.op === 'send' || body.op === 'draft' || body.op === 'schedule') {
+        const saved = data as CoupleNote;
+        setNote(body.op === 'draft' || body.op === 'schedule' ? saved.body : '');
+        setDraftId(body.op === 'draft' || body.op === 'schedule' ? saved.id : null);
+        setCouple((current) => {
+          if (!current) return current;
+          const drafts = (current.drafts || []).filter((item) => item.id !== saved.id);
+          const notes = current.notes.filter((item) => item.id !== saved.id);
+          if (saved.status === 'sent') return {...current, notes: [saved, ...notes], drafts};
+          return {...current, drafts: [saved, ...drafts], notes};
+        });
+        toast.success(body.op === 'draft' ? 'Draft saved.' : body.op === 'schedule' ? 'Note scheduled for that day.' : 'Note sent to your shared space.');
       } else {
         setCouple(data as CouplePayload);
         setAnswer('');
@@ -279,7 +308,11 @@ export function OurSpaceView({
       });
       const data = await r.json() as {error?: string};
       if (!r.ok) throw new Error(data.error || 'Could not remove that note.');
-      setCouple((current) => current ? {...current, notes: current.notes.filter((item) => item.id !== id)} : current);
+      setCouple((current) => current ? {
+        ...current,
+        notes: current.notes.filter((item) => item.id !== id),
+        drafts: (current.drafts || []).filter((item) => item.id !== id),
+      } : current);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -364,22 +397,73 @@ export function OurSpaceView({
         </section>
       </div>
       <section className="card couple-notes-card">
-        <SectionTitle title="Love notes" sub="Short messages that stay in your couple space."/>
-        <form className="note-compose" onSubmit={(e: FormEvent) => {e.preventDefault(); if (note.trim()) void post({op: 'note', body: note.trim()});}}>
+        <SectionTitle title="Love notes" sub="Draft, send, or schedule a note. Closeness decides what they unlock."/>
+        <form className="note-compose love-form" onSubmit={(e: FormEvent) => {e.preventDefault(); if (note.trim()) void post({op: draftId ? 'send' : 'note', id: draftId || undefined, body: note.trim(), visibility});}}>
           <label className="sr-only" htmlFor="couple-note">Write a love note</label>
           <textarea id="couple-note" maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="A little note for the two of you…"/>
-          <button className="primary-button" disabled={busy || !note.trim() || !signedIn}><MessageCircleHeart size={16}/>Send note</button>
+          <label>Who can unlock this note
+            <select value={visibility} onChange={(e) => setVisibility(Number(e.target.value) as 100|50|25)}>
+              <option value={100}>Favorite — full note</option>
+              <option value={50}>Close and favorite — mid-tier</option>
+              <option value={25}>Everyone in the link</option>
+            </select>
+          </label>
+          {!!ownDays.length && (
+            <label>Send on a special day
+              <select value={specialDayId} onChange={(e) => setSpecialDayId(e.target.value)}>
+                <option value="">Send now, or pick a day</option>
+                {ownDays.map((day) => <option key={day.id} value={day.id}>{day.label}</option>)}
+              </select>
+            </label>
+          )}
+          <div className="button-row">
+            <button className="primary-button" disabled={busy || !note.trim() || !signedIn}><MessageCircleHeart size={16}/>{draftId ? 'Send draft' : 'Send note'}</button>
+            <button type="button" className="outline-button" disabled={busy || !note.trim() || !signedIn} onClick={() => void post({op: 'draft', id: draftId || undefined, body: note.trim(), visibility})}>Save draft</button>
+            {specialDayId && (
+              <button type="button" className="outline-button" disabled={busy || !note.trim() || !signedIn} onClick={() => void post({op: 'schedule', id: draftId || undefined, body: note.trim(), visibility, specialDayId})}>Send on that day</button>
+            )}
+            {draftId && <button type="button" className="text-button" onClick={() => {setDraftId(null); setNote('');}}>Clear</button>}
+          </div>
         </form>
+        <div className="mood-row" role="group" aria-label="Love note list">
+          {([
+            ['all','All sent'],
+            ['received','Received'],
+            ['sent','Sent'],
+            ['drafts','Drafts'],
+          ] as const).map(([value,label]) => (
+            <button type="button" key={value} className={noteFilter === value ? 'active' : ''} onClick={() => setNoteFilter(value)}>{label}</button>
+          ))}
+        </div>
         <div className="note-list">
-          {(couple?.notes || []).map((item) => (
+          {(noteFilter === 'drafts' ? (couple?.drafts || []) : (couple?.notes || []).filter((item) => {
+            if (noteFilter === 'sent') return item.mine;
+            if (noteFilter === 'received') return !item.mine;
+            return true;
+          })).map((item) => (
             <article className={'couple-note ' + (item.mine ? 'mine' : '')} key={item.id}>
               <p>{item.body}</p>
-              <small>{item.mine ? 'You' : (couple?.partner?.name || 'Partner')} · {dateLabel(item.createdAt, state.profile.myTimezone, true)}</small>
+              <small>
+                {item.mine ? 'You' : (couple?.partner?.name || 'Partner')}
+                {' · '}
+                {item.status === 'scheduled' ? 'Scheduled' : item.status === 'draft' ? 'Draft' : dateLabel(item.sentAt || item.createdAt, state.profile.myTimezone, true)}
+                {item.visibility ? ` · ${visibilityLabel(item.visibility)}` : ''}
+              </small>
+              {item.mine && item.status !== 'sent' && (
+                <button type="button" className="text-button" onClick={() => {
+                  setDraftId(item.id);
+                  setNote(item.body);
+                  setVisibility(item.visibility || 100);
+                  setSpecialDayId(item.specialDayId || '');
+                }}>Edit</button>
+              )}
               {item.mine && <button className="icon-button" aria-label="Remove note" disabled={busy} onClick={() => void removeNote(item.id)}><Trash2 size={14}/></button>}
             </article>
           ))}
-          {!couple?.notes.length && <EmptyState title="No notes yet" description="Leave something kind. Only your linked partner will see it here."/>}
+          {noteFilter === 'drafts' && !couple?.drafts?.length && <EmptyState title="No drafts" description="Save a note here until you are ready to send it."/>}
+          {noteFilter !== 'drafts' && !couple?.notes.length && <EmptyState title="No notes yet" description="Leave something kind. Only your linked partner will see it here."/>}
         </div>
+        {!!couple?.lockedNotes && <p className="help-text">{LOCKED_NOTE_COPY}</p>}
       </section>
       <section>
         <SectionTitle title="Shared timeline" sub="Memories you both can see, plus your notes." action={<button className="text-button" onClick={() => onNavigate('memories')}>Open memories</button>}/>

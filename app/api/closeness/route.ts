@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {closenessToward,isClosenessLevel,setCloseness} from '@/lib/closeness';
+import {closenessToward,isClosenessLevel,setCloseness,viewerUnlocks} from '@/lib/closeness';
 import {currentPartner} from '@/lib/partner-safety';
 import {assertRateLimit} from '@/lib/rate-limit';
 import {ApiError,ensureUser,failure,guard,jsonBody,response} from '@/lib/server';
@@ -16,7 +16,7 @@ export async function GET() {
     const ctx = await ensureUser();
     const partner = await currentPartner(ctx);
     const level = partner ? await closenessToward(ctx.userId, partner.userId) : null;
-    return response({partner: partner ? {name: partner.name} : null, level});
+    return response({partner: partner ? {name: partner.name} : null, level, unlocks: viewerUnlocks(level)});
   } catch (e) {
     return failure(e);
   }

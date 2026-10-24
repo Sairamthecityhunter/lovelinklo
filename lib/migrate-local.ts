@@ -16,6 +16,8 @@ export async function ensureLocalSchema(){
   if(!safety)throw new Error('Safety tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
   const push=await database.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'push_subscriptions' AND column_name = 'endpoint'").first();
   if(!push)throw new Error('Push tables are missing. Run `pnpm db:migrate` against DATABASE_URL.');
+  const unlocks=await database.prepare("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'couple_notes' AND column_name = 'status'").first();
+  if(!unlocks)throw new Error('Closeness unlock columns are missing. Run `pnpm db:migrate` against DATABASE_URL.');
  })().catch(e=>{ready=null;throw e;});
  await ready;
 }

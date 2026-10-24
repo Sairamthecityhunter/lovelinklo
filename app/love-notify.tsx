@@ -2,6 +2,7 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {Bell,CalendarDays,Trash2} from 'lucide-react';
 import {toast} from 'sonner';
+import {defaultDayVisibility,LOCKED_CALENDAR_COPY,visibilityLabel} from '@/lib/closeness-unlocks';
 
 type Day = {
   id:string;
@@ -13,12 +14,21 @@ type Day = {
   day:number;
   year:number|null;
   interests:string[];
+  visibility:number;
 };
 
+type UpcomingDay = Day & {mine:boolean;nextDate:string};
+
 const LEVELS = [
-  {value:100,label:'Favorite (100)',help:'Love notes right away, and every special day.'},
-  {value:50,label:'Close (50)',help:'No love-note pushes. One day before each special day.'},
-  {value:25,label:'Quiet (25)',help:'No love-note pushes. Birthday only, one day before.'},
+  {value:100,label:'Favorite (100)',help:'Full love notes, a push when allowed, and every unlocked special day.'},
+  {value:50,label:'Close (50)',help:'Mid-tier notes and 50+ dates. No love-note pushes.'},
+  {value:25,label:'Quiet (25)',help:'Only notes and days marked for everyone. Birthday reminders only.'},
+];
+
+const VISIBILITY = [
+  {value:100,label:'Favorite'},
+  {value:50,label:'Close and favorite'},
+  {value:25,label:'Everyone in the link'},
 ];
 
 async function jsonFetch(path: string, body?: Record<string, unknown>) {
@@ -137,7 +147,7 @@ export function PartnerNotifySettings({
         <div className="setting-row">
           <div>
             <strong>Closeness with {partnerName || 'your partner'}</strong>
-            <p>This only changes what you receive.</p>
+            <p>This only changes what you receive and unlock. They never see this level.</p>
             <div className="mood-row" role="group" aria-label="Closeness level">
               {LEVELS.map((item) => (
                 <button
@@ -195,15 +205,20 @@ export function SpecialDaysCard({
   partnerName:string;
   partnerUserId:string|null;
 }) {
-  const empty = {type:'birthday',label:'',name:'',month:1,day:1,year:'',interests:'',usePartner:true};
+  const empty = {type:'birthday',label:'',name:'',month:1,day:1,year:'',interests:'',usePartner:true,visibility:25};
   const [days,setDays]=useState<Day[]>([]);
+  const [upcoming,setUpcoming]=useState<UpcomingDay[]>([]);
   const [form,setForm]=useState(empty);
   const [editing,setEditing]=useState<string|null>(null);
   const [busy,setBusy]=useState(false);
+  const [lockedCalendar,setLockedCalendar]=useState(false);
 
   async function load() {
     const data = await jsonFetch('/api/special-days');
     setDays((data.days as Day[]) || []);
+    setUpcoming((data.upcoming as UpcomingDay[]) || []);
+    const unlocks = data.unlocks as {everyoneCalendar?:boolean;richestCalendar?:boolean}|undefined;
+    setLockedCalendar(!!unlocks && unlocks.everyoneCalendar === true && unlocks.richestCalendar === false);
   }
   useEffect(() => {
     if (signedIn) void load().catch(() => {});
@@ -219,18 +234,34 @@ export function SpecialDaysCard({
       <div className="section-title">
         <div>
           <h2>Special days</h2>
-          <p>Birthdays, anniversaries, and custom dates. Interests stay on your side and shape full-mode reminder ideas.</p>
+          <p>Birthdays, anniversaries, and custom dates. Interests stay on your side and shape full-mode reminder ideas. Visibility decides what closeness unlocks a day.</p>
         </div>
       </div>
+      {!!upcoming.length && (
+        <div className="note-list">
+          <p className="help-text">Upcoming days your closeness unlocks.</p>
+          {upcoming.slice(0, 8).map((day) => (
+            <div className="date-row" key={'up-'+day.id}>
+              <strong>{day.label}</strong>
+              <span>{day.nextDate} · {day.type} · {visibilityLabel(day.visibility as 100|50|25)}{day.mine ? '' : ' · shared'}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {lockedCalendar && <p className="help-text">{LOCKED_CALENDAR_COPY}</p>}
       <div className="note-list">
         {days.map((day) => (
           <article className="couple-note" key={day.id}>
             <p>{day.label} · {day.type} · {day.month}/{day.day}{day.year ? `/${day.year}` : ''}</p>
-            <small>{day.name || partnerName}{day.interests.length ? ` · ${day.interests.join(', ')}` : ''}</small>
+            <small>{day.name || partnerName} · {visibilityLabel((day.visibility || 100) as 100|50|25)}{day.interests.length ? ` · ${day.interests.join(', ')}` : ''}</small>
             <button className="icon-button" aria-label="Remove special day" disabled={busy} onClick={() => {
               setBusy(true);
               void jsonFetch('/api/special-days', {op: 'delete', id: day.id})
-                .then((data) => {setDays((data.days as Day[]) || []); toast.success('Removed.');})
+                .then((data) => {
+                  setDays((data.days as Day[]) || []);
+                  setUpcoming((data.upcoming as UpcomingDay[]) || []);
+                  toast.success('Removed.');
+                })
                 .catch((e) => toast.error((e as Error).message))
                 .finally(() => setBusy(false));
             }}><Trash2 size={14}/></button>
@@ -245,6 +276,7 @@ export function SpecialDaysCard({
                 year: day.year ? String(day.year) : '',
                 interests: day.interests.join(', '),
                 usePartner: !!day.personUserId,
+                visibility: day.visibility || 25,
               });
             }}>Edit</button>
           </article>
@@ -266,15 +298,17 @@ export function SpecialDaysCard({
           day: Number(form.day),
           year: form.year ? Number(form.year) : null,
           interests,
+          visibility: form.visibility,
         }).then((data) => {
           setDays((data.days as Day[]) || []);
+          setUpcoming((data.upcoming as UpcomingDay[]) || []);
           reset();
           toast.success(editing ? 'Special day updated.' : 'Special day saved.');
         }).catch((err) => toast.error((err as Error).message)).finally(() => setBusy(false));
       }}>
         <label>Label<input required maxLength={80} value={form.label} onChange={(e) => setForm((s) => ({...s,label:e.target.value}))} placeholder="Maya’s birthday"/></label>
         <label>Type
-          <select value={form.type} onChange={(e) => setForm((s) => ({...s,type:e.target.value}))}>
+          <select value={form.type} onChange={(e) => setForm((s) => ({...s,type:e.target.value,visibility:editing ? s.visibility : defaultDayVisibility(e.target.value)}))}>
             <option value="birthday">Birthday</option>
             <option value="anniversary">Anniversary</option>
             <option value="custom">Custom</option>
@@ -292,6 +326,11 @@ export function SpecialDaysCard({
           <label>Day<input required type="number" min={1} max={31} value={form.day} onChange={(e) => setForm((s) => ({...s,day:Number(e.target.value)}))}/></label>
           <label>Year (optional)<input type="number" min={1900} max={2100} value={form.year} onChange={(e) => setForm((s) => ({...s,year:e.target.value}))}/></label>
         </div>
+        <label>Who can unlock this day
+          <select value={form.visibility} onChange={(e) => setForm((s) => ({...s,visibility:Number(e.target.value)}))}>
+            {VISIBILITY.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
         <label>Interests<textarea maxLength={200} value={form.interests} onChange={(e) => setForm((s) => ({...s,interests:e.target.value}))} placeholder="Coffee, film photography, hiking"/></label>
         <div className="button-row">
           <button className="primary-button" disabled={!signedIn || busy}><CalendarDays size={16}/>{editing ? 'Save day' : 'Add special day'}</button>

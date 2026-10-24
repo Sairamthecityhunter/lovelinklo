@@ -106,6 +106,9 @@ try {
   });
   assert.equal(sharedMemory.status, 200, JSON.stringify(sharedMemory.data));
 
+  const draft = await asA('/api/couple', {method: 'POST', body: {op: 'draft', body: 'A draft they should not see yet.', visibility: 100}});
+  assert.equal(draft.status, 200, JSON.stringify(draft.data));
+  assert.equal(draft.data.status, 'draft');
   const note = await asA('/api/couple', {method: 'POST', body: {op: 'note', body: 'A private hello only we should see.'}});
   assert.equal(note.status, 200, JSON.stringify(note.data));
   const noteId = note.data.id;
@@ -144,6 +147,8 @@ try {
   assert.equal(coupleA.status, 200, JSON.stringify(coupleA.data));
   assert.equal(coupleA.data.partner?.name, 'Maya');
   assert.ok(coupleB.data.notes.some((item) => item.id === noteId), 'linked partner should see shared notes');
+  assert.ok(!coupleB.data.notes.some((item) => item.id === draft.data.id), 'linked partner must not see drafts');
+  assert.ok(!(coupleB.data.drafts || []).some((item) => item.id === draft.data.id), 'drafts stay with the author');
   assert.equal(coupleB.data.checkIn.partner, 'hidden');
   assert.equal(coupleB.data.checkIn.mine, null);
 

@@ -1,11 +1,19 @@
 import {ApiError,db} from '@/lib/server';
+import {CLOSENESS_LEVELS, isClosenessLevel, type ClosenessLevel} from './closeness-unlocks';
 
-export const CLOSENESS_LEVELS = [100, 50, 25] as const;
-export type ClosenessLevel = (typeof CLOSENESS_LEVELS)[number];
-
-export function isClosenessLevel(value: unknown): value is ClosenessLevel {
-  return value === 100 || value === 50 || value === 25;
-}
+export {CLOSENESS_LEVELS, isClosenessLevel, type ClosenessLevel};
+export {
+  LOCKED_CALENDAR_COPY,
+  LOCKED_NOTE_COPY,
+  asClosenessLevel,
+  canSeeByCloseness,
+  canSeeCalendarItem,
+  canSeeNote,
+  defaultDayVisibility,
+  unlocksLoveNotePush,
+  viewerUnlocks,
+  visibilityLabel,
+} from './closeness-unlocks';
 
 export async function closenessToward(ownerUserId: string, targetUserId: string): Promise<ClosenessLevel | null> {
   const row = await db().prepare(

@@ -1,4 +1,4 @@
-import {runSpecialReminders} from '@/lib/special-reminders';
+import {runScheduledNotes,runSpecialReminders} from '@/lib/special-reminders';
 import {failure,response} from '@/lib/server';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,8 @@ export async function GET(request: Request) {
   if (!authorized(request)) return response({error: 'Unauthorized'}, 401);
   try {
     const sent = await runSpecialReminders();
-    return response({ok: true, sent});
+    const notes = await runScheduledNotes();
+    return response({ok: true, sent, notes});
   } catch (e) {
     return failure(e);
   }
@@ -33,8 +34,10 @@ export async function POST(request: Request) {
         if (!Number.isNaN(parsed.getTime())) at = parsed;
       }
     } catch { /* use now */ }
-    const sent = await runSpecialReminders(at || new Date());
-    return response({ok: true, sent});
+    const when = at || new Date();
+    const sent = await runSpecialReminders(when);
+    const notes = await runScheduledNotes(when);
+    return response({ok: true, sent, notes});
   } catch (e) {
     return failure(e);
   }

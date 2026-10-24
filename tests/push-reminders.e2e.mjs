@@ -169,6 +169,47 @@ try {
   assert.equal((await outbox(userB, 'love-note')).length, 1, 'no closeness level should not push');
   assert.equal((await asB('/api/closeness', {method: 'POST', body: {op: 'set', level: 100}})).status, 200);
 
+  const draft = await asA('/api/couple', {method: 'POST', body: {op: 'draft', body: `Hidden draft ${stamp}`, visibility: 100}});
+  assert.equal(draft.status, 200, JSON.stringify(draft.data));
+  assert.equal(draft.data.status, 'draft');
+  const coupleDraftB = await asB('/api/couple');
+  assert.equal(coupleDraftB.status, 200, JSON.stringify(coupleDraftB.data));
+  assert.ok(!coupleDraftB.data.notes.some((item) => item.id === draft.data.id), 'partner must not see drafts');
+  assert.ok(!(coupleDraftB.data.drafts || []).some((item) => item.id === draft.data.id), 'partner must not receive author drafts');
+  const coupleDraftA = await asA('/api/couple');
+  assert.ok((coupleDraftA.data.drafts || []).some((item) => item.id === draft.data.id), 'author should see their draft');
+
+  assert.equal((await asB('/api/closeness', {method: 'POST', body: {op: 'set', level: 50}})).status, 200);
+  const sentFull = await asA('/api/couple', {method: 'POST', body: {op: 'send', id: draft.data.id, visibility: 100}});
+  assert.equal(sentFull.status, 200, JSON.stringify(sentFull.data));
+  assert.equal(sentFull.data.status, 'sent');
+  const coupleB50 = await asB('/api/couple');
+  assert.ok(!coupleB50.data.notes.some((item) => item.id === draft.data.id), 'closeness 50 must not unlock a favorite note');
+  assert.ok(!JSON.stringify(coupleB50.data.notes).includes(`Hidden draft ${stamp}`), 'locked note body must stay off the partner response');
+  assert.ok((coupleB50.data.lockedNotes || 0) >= 1);
+
+  const midNote = await asA('/api/couple', {method: 'POST', body: {op: 'note', body: `Mid-tier note ${stamp}`, visibility: 50}});
+  assert.equal(midNote.status, 200, JSON.stringify(midNote.data));
+  const coupleBMid = await asB('/api/couple');
+  assert.ok(coupleBMid.data.notes.some((item) => item.id === midNote.data.id), 'closeness 50 should unlock a mid-tier note');
+
+  assert.equal((await asB('/api/closeness', {method: 'POST', body: {op: 'set', level: 25}})).status, 200);
+  const everyoneNote = await asA('/api/couple', {method: 'POST', body: {op: 'note', body: `Everyone note ${stamp}`, visibility: 25}});
+  assert.equal(everyoneNote.status, 200, JSON.stringify(everyoneNote.data));
+  const coupleB25 = await asB('/api/couple');
+  assert.ok(coupleB25.data.notes.some((item) => item.id === everyoneNote.data.id), 'closeness 25 should unlock everyone notes');
+  assert.ok(!coupleB25.data.notes.some((item) => item.id === midNote.data.id), 'closeness 25 must not unlock a mid-tier note');
+  assert.ok(!coupleB25.data.unlocks.fullNotes);
+  assert.equal(coupleB25.data.unlocks.everyoneNotes, true);
+
+  assert.equal((await asB('/api/closeness', {method: 'POST', body: {op: 'set', level: 100}})).status, 200);
+  const coupleB100 = await asB('/api/couple');
+  assert.ok(coupleB100.data.notes.some((item) => item.id === draft.data.id), 'closeness 100 should unlock the favorite note');
+  const removedMid = await asA('/api/couple', {method: 'POST', body: {op: 'delete-note', id: midNote.data.id}});
+  assert.equal(removedMid.status, 200, JSON.stringify(removedMid.data));
+  const coupleAfterDelete = await asB('/api/couple');
+  assert.ok(!coupleAfterDelete.data.notes.some((item) => item.id === midNote.data.id), 'author delete must remove the note for both');
+
   const birthday = await asA('/api/special-days', {
     method: 'POST',
     body: {
@@ -303,6 +344,69 @@ try {
   assert.match(simplePushes[0].body, /hour/i);
   assert.doesNotMatch(simplePushes[0].body, /Idea:/);
 
+  assert.equal((await asA('/api/special-days', {method: 'POST', body: {op: 'prefs', mode: 'full', lead: '1d'}})).status, 200);
+  assert.equal((await asA('/api/closeness', {method: 'POST', body: {op: 'set', level: 25}})).status, 200);
+  const upcoming25 = await asA('/api/special-days');
+  assert.equal(upcoming25.status, 200, JSON.stringify(upcoming25.data));
+  assert.ok(upcoming25.data.upcoming.some((day) => day.label === 'Maya birthday'), 'closeness 25 should keep everyone-marked birthdays');
+  assert.ok(!upcoming25.data.upcoming.some((day) => day.label === 'Our anniversary'), 'closeness 25 must hide 50+ calendar items');
+
+  assert.equal((await asA('/api/closeness', {method: 'POST', body: {op: 'set', level: 50}})).status, 200);
+  const upcoming50 = await asA('/api/special-days');
+  assert.ok(upcoming50.data.upcoming.some((day) => day.label === 'Our anniversary'), 'closeness 50 should unlock 50+ calendar items');
+  const richest = await asA('/api/special-days', {
+    method: 'POST',
+    body: {
+      op: 'create',
+      type: 'custom',
+      label: 'Favorite only dinner',
+      personUserId: userB,
+      name: 'Maya',
+      month: 11,
+      day: 11,
+      visibility: 100,
+      interests: ['candles'],
+    },
+  });
+  assert.equal(richest.status, 200, JSON.stringify(richest.data));
+  assert.ok(!richest.data.upcoming.some((day) => day.label === 'Favorite only dinner'), 'closeness 50 must not unlock a favorite-only day');
+
+  assert.equal((await asA('/api/closeness', {method: 'POST', body: {op: 'set', level: 100}})).status, 200);
+  const upcoming100 = await asA('/api/special-days');
+  assert.ok(upcoming100.data.upcoming.some((day) => day.label === 'Favorite only dinner'), 'closeness 100 should unlock the richest calendar items');
+
+  const scheduledDay = await asA('/api/special-days', {
+    method: 'POST',
+    body: {
+      op: 'create',
+      type: 'custom',
+      label: 'Note delivery day',
+      personUserId: userB,
+      name: 'Maya',
+      month: 12,
+      day: 12,
+      visibility: 25,
+      interests: ['letters'],
+    },
+  });
+  assert.equal(scheduledDay.status, 200, JSON.stringify(scheduledDay.data));
+  const scheduledDayId = scheduledDay.data.days.find((day) => day.label === 'Note delivery day').id;
+  const scheduled = await asA('/api/couple', {
+    method: 'POST',
+    body: {op: 'schedule', body: `Scheduled note ${stamp}`, visibility: 100, specialDayId: scheduledDayId},
+  });
+  assert.equal(scheduled.status, 200, JSON.stringify(scheduled.data));
+  assert.equal(scheduled.data.status, 'scheduled');
+  const beforeSchedule = await asB('/api/couple');
+  assert.ok(!beforeSchedule.data.notes.some((item) => item.id === scheduled.data.id), 'scheduled notes stay off the partner list until the day');
+
+  const noteCron = await runCron('2026-12-12T16:00:00.000Z');
+  assert.equal(noteCron.status, 200, JSON.stringify(noteCron.data));
+  assert.equal(noteCron.data.notes, 1, 'cron should deliver a scheduled love note on the special day');
+  const afterSchedule = await asB('/api/couple');
+  assert.ok(afterSchedule.data.notes.some((item) => item.id === scheduled.data.id && item.body.includes(`Scheduled note ${stamp}`)));
+  assert.equal((await outbox(userB, 'love-note')).length, 2, 'scheduled delivery should push when the viewer is favorite');
+
   const bDays = await asB('/api/special-days', {
     method: 'POST',
     body: {
@@ -332,6 +436,11 @@ try {
     [userA, userB],
   );
   assert.equal(daysLeft.rowCount, 0, 'block must delete special days referring to each other');
+  const notesLeft = await pool.query(
+    'SELECT * FROM couple_notes WHERE owner_id = $1 OR owner_id = $2',
+    [userA, userB],
+  );
+  assert.equal(notesLeft.rowCount, 0, 'block must purge pair love notes');
   const remindersLeft = await pool.query(
     'SELECT * FROM sent_reminders WHERE owner_user_id = $1 OR owner_user_id = $2',
     [userA, userB],
@@ -383,7 +492,7 @@ try {
   assert.equal(deleted.status, 200, JSON.stringify(deleted.data));
   assert.ok(!deleted.data.days.some((day) => day.id === dayId));
 
-  console.log('PASS: push subscribe/unsubscribe, note targeting by closeness, reminder timing, cron dedupe, cron auth, and quiet block cleanup.');
+  console.log('PASS: push subscribe/unsubscribe, note targeting by closeness, draft/send gating, calendar unlocks, scheduled notes, reminder timing, cron dedupe, cron auth, and quiet block cleanup.');
 } finally {
   await pool.end().catch(() => {});
   if (child) {

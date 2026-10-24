@@ -1,4 +1,6 @@
-import {closenessToward, type ClosenessLevel} from '@/lib/closeness';
+import {canSeeCalendarItem,closenessToward, type ClosenessLevel} from '@/lib/closeness';
+import {asClosenessLevel} from '@/lib/closeness-unlocks';
+import {notifyNoteRecipients} from '@/lib/notify-notes';
 import {db} from '@/lib/server';
 import {deliverPush} from '@/lib/web-push';
 
@@ -16,9 +18,25 @@ type SpecialDayRow = {
   day: number;
   year: number | null;
   interests: string;
+  visibility: number;
   reminder_mode: string;
   reminder_lead: string;
   timezone: string;
+};
+
+export type UpcomingDay = {
+  id: string;
+  personUserId: string | null;
+  name: string | null;
+  type: string;
+  label: string;
+  month: number;
+  day: number;
+  year: number | null;
+  interests: string[];
+  visibility: ClosenessLevel;
+  mine: boolean;
+  nextDate: string;
 };
 
 export function parseInterests(raw: string) {
@@ -35,7 +53,7 @@ function ideaFrom(interests: string[]) {
   return `Something around ${interests[0]}.`;
 }
 
-function zonedParts(at: Date, timeZone: string) {
+export function zonedParts(at: Date, timeZone: string) {
   try {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone,
@@ -52,12 +70,22 @@ function zonedParts(at: Date, timeZone: string) {
   }
 }
 
-function nextOccurrence(row: SpecialDayRow, now: Date) {
-  const zone = row.timezone || 'UTC';
-  const parts = zonedParts(now, zone);
+export function nextOccurrenceParts(month: number, day: number, now: Date, timeZone: string) {
+  const parts = zonedParts(now, timeZone);
   let year = parts.year;
-  if (parts.month > row.month || (parts.month === row.month && parts.day > row.day)) year += 1;
-  return {year, month: row.month, day: row.day};
+  if (parts.month > month || (parts.month === month && parts.day > day)) year += 1;
+  return {year, month, day};
+}
+
+export function nextOccurrenceDate(month: number, day: number, now: Date, timeZone: string) {
+  const next = nextOccurrenceParts(month, day, now, timeZone);
+  const mm = String(next.month).padStart(2, '0');
+  const dd = String(next.day).padStart(2, '0');
+  return `${next.year}-${mm}-${dd}`;
+}
+
+function nextOccurrence(row: SpecialDayRow, now: Date) {
+  return nextOccurrenceParts(row.month, row.day, now, row.timezone || 'UTC');
 }
 
 function leadHours(level: ClosenessLevel | null, mode: ReminderMode, pref: ReminderLead) {
@@ -74,15 +102,51 @@ function includesType(row: SpecialDayRow, level: ClosenessLevel | null, mode: Re
   return true;
 }
 
+function includesVisibility(row: SpecialDayRow, level: ClosenessLevel | null) {
+  return canSeeCalendarItem(level, asClosenessLevel(row.visibility, 100));
+}
+
 async function ownerLevel(row: SpecialDayRow): Promise<ClosenessLevel | null> {
   if (row.person_user_id) return closenessToward(row.owner_user_id, row.person_user_id);
   return 100;
 }
 
+export function asUpcomingDay(row: {
+  id: string;
+  person_user_id: string | null;
+  name: string | null;
+  type: string;
+  label: string;
+  month: number;
+  day: number;
+  year: number | null;
+  interests: string;
+  visibility: number;
+}, mine: boolean, now: Date, timeZone: string): UpcomingDay {
+  return {
+    id: row.id,
+    personUserId: row.person_user_id,
+    name: row.name,
+    type: row.type,
+    label: row.label,
+    month: row.month,
+    day: row.day,
+    year: row.year,
+    interests: parseInterests(row.interests),
+    visibility: asClosenessLevel(row.visibility, 100),
+    mine,
+    nextDate: nextOccurrenceDate(row.month, row.day, now, timeZone),
+  };
+}
+
+export function sortUpcoming(days: UpcomingDay[]) {
+  return [...days].sort((a, b) => a.nextDate.localeCompare(b.nextDate) || a.label.localeCompare(b.label));
+}
+
 export async function runSpecialReminders(now = new Date()) {
   const database = db();
   const rows = await database.prepare(
-    `SELECT d.id, d.owner_user_id, d.person_user_id, d.name, d.type, d.label, d.month, d.day, d.year, d.interests,
+    `SELECT d.id, d.owner_user_id, d.person_user_id, d.name, d.type, d.label, d.month, d.day, d.year, d.interests, d.visibility,
             u.reminder_mode, u.reminder_lead, u.profile_json
      FROM special_days d
      JOIN users u ON u.id = d.owner_user_id`,
@@ -101,7 +165,7 @@ export async function runSpecialReminders(now = new Date()) {
     };
     const level = await ownerLevel(row);
     const mode = row.reminder_mode as ReminderMode;
-    if (!includesType(row, level, mode)) continue;
+    if (!includesType(row, level, mode) || !includesVisibility(row, level)) continue;
     const lead = leadHours(level, mode, row.reminder_lead as ReminderLead);
     if (lead == null) continue;
     const next = nextOccurrence(row, now);
@@ -127,6 +191,49 @@ export async function runSpecialReminders(now = new Date()) {
       body: `${who} — ${row.type} is ${when}.${idea}`,
       url: '/us',
     });
+    sent += 1;
+  }
+  return sent;
+}
+
+export async function runScheduledNotes(now = new Date()) {
+  const database = db();
+  const rows = await database.prepare(
+    `SELECT n.id, n.couple_id, n.owner_id, n.body, n.visibility, n.special_day_id,
+            d.month, d.day, u.profile_json
+     FROM couple_notes n
+     JOIN special_days d ON d.id = n.special_day_id
+     JOIN users u ON u.id = n.owner_id
+     WHERE n.status = 'scheduled'`,
+  ).all<{
+    id: string;
+    couple_id: string;
+    owner_id: string;
+    body: string;
+    visibility: number;
+    special_day_id: string;
+    month: number;
+    day: number;
+    profile_json: string;
+  }>();
+  let sent = 0;
+  for (const row of rows.results) {
+    let timezone = 'UTC';
+    let authorName = '';
+    try {
+      const profile = JSON.parse(row.profile_json) as {myTimezone?: string; myName?: string};
+      timezone = profile.myTimezone || 'UTC';
+      authorName = profile.myName?.trim() || '';
+    } catch { /* UTC */ }
+    const parts = zonedParts(now, timezone);
+    if (parts.month !== row.month || parts.day !== row.day) continue;
+    const sentAt = now.toISOString();
+    const claimed = await database.prepare(
+      `UPDATE couple_notes SET status = 'sent', sent_at = ?, updated_at = ?
+       WHERE id = ? AND status = 'scheduled'`,
+    ).bind(sentAt, sentAt, row.id).run();
+    if (!claimed.meta.changes) continue;
+    await notifyNoteRecipients({userId: row.owner_id, coupleId: row.couple_id}, authorName).catch(() => {});
     sent += 1;
   }
   return sent;
