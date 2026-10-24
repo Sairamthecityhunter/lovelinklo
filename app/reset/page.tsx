@@ -1,6 +1,6 @@
 import type {Metadata} from 'next';
 import {redirect} from 'next/navigation';
-import {currentUser} from '@/lib/server';
+import {currentSessionUser} from '@/lib/session-auth';
 import {ResetForm} from '../auth-reset-form';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ResetPage({searchParams}:{searchParams:Promise<{token?:string}>}) {
-  const user = await currentUser();
+  const user = await currentSessionUser();
   if (user) redirect('/');
   const {token} = await searchParams;
   return <ResetForm token={token || ''}/>;

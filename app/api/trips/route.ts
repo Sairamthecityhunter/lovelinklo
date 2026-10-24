@@ -129,9 +129,9 @@ async function syncTripReminder(
   return id;
 }
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     return response(await listTrips(ctx));
   } catch (e) {
     return failure(e);
@@ -141,7 +141,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     await assertRateLimit('trips:' + ctx.userId, 40, 60 * 60 * 1000);
     const body = await jsonBody(request, 4000);
     const database = db();

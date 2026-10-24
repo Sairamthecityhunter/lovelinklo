@@ -62,7 +62,7 @@ export async function resolveDashboardAccess(input: {
   actor?: DashboardActor;
 } = {}): Promise<{ok: boolean; via: DashboardVia | null; message: string; actor: DashboardActor}> {
   const env = dashboardEnvFromProcess();
-  const actor = input.actor === undefined ? await currentUser() : input.actor;
+  const actor = input.actor === undefined ? await currentUser(input.request) : input.actor;
   const presented = input.presentedSecret
     ?? secretFromRequest(input.request, input.cookieHeader)
     ?? '';

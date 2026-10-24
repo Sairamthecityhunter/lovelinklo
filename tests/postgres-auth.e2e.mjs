@@ -113,6 +113,19 @@ try {
   const afterLogout = await request('/api/state');
   assert.equal(afterLogout.status, 401, JSON.stringify(afterLogout.data));
 
+  const spoofed = await fetch(base + '/api/state', {
+    headers: {
+      'oai-authenticated-user-id': 'attacker-takes-over',
+      'oai-authenticated-user-email': email,
+    },
+  });
+  assert.equal(spoofed.status, 401, 'spoofed oai headers must not authenticate without a session');
+
+  const loginPage = await fetch(base + '/login', {redirect: 'manual'});
+  assert.equal(loginPage.status, 200, 'signed-out users must reach the email login form');
+  const registerPage = await fetch(base + '/register', {redirect: 'manual'});
+  assert.equal(registerPage.status, 200, 'signed-out users must reach the email register form');
+
   cookie = '';
   const login = await request('/api/auth/login', {method: 'POST', withCookie: false, body: {email, password}});
   assert.equal(login.status, 200, JSON.stringify(login.data));
@@ -120,7 +133,29 @@ try {
   assert.equal(restored.status, 200, JSON.stringify(restored.data));
   assert.equal(restored.data.pins.find((item) => item.id === pin.id)?.message, 'Persisted through DATABASE_URL');
 
-  console.log('PASS: register, session cookie, seeded state, pin save, logout, sign-in, and durable read against Postgres.');
+  const signedInLogin = await fetch(base + '/login', {
+    headers: {Cookie: `__lovelink_session=${cookie}`},
+    redirect: 'manual',
+  });
+  assert.ok([302, 303, 307, 308].includes(signedInLogin.status), 'session users bounce from /login to the couple space');
+
+  const signOut = await fetch(base + '/signout', {
+    headers: {Cookie: `__lovelink_session=${cookie}`},
+    redirect: 'manual',
+  });
+  assert.ok([302, 303].includes(signOut.status), 'GET /signout must redirect instead of 404');
+  assert.equal(new URL(signOut.headers.get('location') || '', base).pathname, '/login');
+  const cleared = signOut.headers.getSetCookie?.().find((value) => value.startsWith('__lovelink_session='))
+    || signOut.headers.get('set-cookie')
+    || '';
+  assert.match(cleared, /Max-Age=0/);
+  cookie = '';
+  const afterSignOut = await request('/api/state', {withCookie: false});
+  assert.equal(afterSignOut.status, 401, JSON.stringify(afterSignOut.data));
+  const loginAfterSignOut = await fetch(base + '/login', {redirect: 'manual'});
+  assert.equal(loginAfterSignOut.status, 200);
+
+  console.log('PASS: register, session cookie, seeded state, pin save, logout, sign-in, sign-out route, and durable read against Postgres.');
 } finally {
   if (child) {
     child.kill('SIGTERM');

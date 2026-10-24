@@ -12,7 +12,7 @@ async function config(userId:string){
  return {iceServers:[{urls:'stun:stun.cloudflare.com:3478'}],relay:false};
 }
 export async function POST(request:Request){try{
- guard(request);const ctx=await ensureUser(),body=input.parse(await jsonBody(request,52000)),database=db();const s=await sessionFor(ctx,body.session);const current=await snapshot(s);
+ guard(request);const ctx=await ensureUser(request),body=input.parse(await jsonBody(request,52000)),database=db();const s=await sessionFor(ctx,body.session);const current=await snapshot(s);
  if(s.mode==='city')throw new ApiError(409,'Invite someone to a private conversation before starting a call.');
  if(!s.room_id||current.status!=='active'||s.updated_at<Date.now()-20000)throw new ApiError(409,'Join an active room before calling.');
  const peers=await database.prepare('SELECT * FROM world_sessions WHERE room_id = ? AND user_id != ? AND updated_at > ?').bind(s.room_id,ctx.userId,Date.now()-20000).all<WorldSession>();

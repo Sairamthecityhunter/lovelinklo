@@ -191,9 +191,9 @@ async function updateOwnedNote(ctx: {userId: string; coupleId: string}, id: stri
   return noteRow(id, ctx);
 }
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     return response(await couplePayload(ctx));
   } catch (e) {
     return failure(e);
@@ -203,7 +203,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     await assertRateLimit('couple:write:' + ctx.userId, 60, 60 * 60 * 1000);
     const body = await jsonBody(request, 4000);
     const database = db();

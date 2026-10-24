@@ -12,7 +12,7 @@ const bodySchema=z.object({
 export async function POST(request:Request){
  try{
   guard(request);
-  const ctx=await ensureUser();
+  const ctx=await ensureUser(request);
   const body=bodySchema.parse(await jsonBody(request,2000));
   const token=await changePassword(ctx.userId,body.currentPassword,body.newPassword);
   return withSessionCookie({ok:true},token,request);

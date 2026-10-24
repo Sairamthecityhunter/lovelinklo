@@ -121,9 +121,9 @@ async function listOrders(ctx: {userId: string; coupleId: string}) {
   };
 }
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     return response(await listOrders(ctx));
   } catch (e) {
     return failure(e);
@@ -133,7 +133,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     await assertRateLimit('gift-orders:' + ctx.userId, 40, 60 * 60 * 1000);
     const body = await jsonBody(request, 4000);
     const database = db();

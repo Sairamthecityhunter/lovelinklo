@@ -18,9 +18,9 @@ const unsubscribeSchema = z.object({
   endpoint: z.string().trim().url().max(2048),
 }).strict();
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const row = await db().prepare(
       'SELECT endpoint FROM push_subscriptions WHERE user_id = ? LIMIT 1',
     ).bind(ctx.userId).first<{endpoint: string}>();
@@ -36,7 +36,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const body = await jsonBody(request, 4000);
     const database = db();
     if (body.op === 'subscribe') {

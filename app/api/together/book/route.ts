@@ -5,7 +5,7 @@ import {localInput} from '@/lib/love-time';
 export const dynamic='force-dynamic';
 const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export async function POST(request:Request){try{
- guard(request);const ctx=await ensureUser();
+ guard(request);const ctx=await ensureUser(request);
  if(!(await entitlements(ctx.coupleId)).premium)throw new ApiError(403,'Monthly memory-book downloads are included with Together membership. Your original memories stay free.');
  const input=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),ids:z.array(z.string().min(1).max(200)).min(1).max(20)}).strict().parse(await jsonBody(request,6000));
  const state=await readState(ctx);const memories=[...new Set(input.ids)].map(id=>state.memories.find(m=>m.id===id));

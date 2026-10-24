@@ -1,13 +1,34 @@
-import {env} from '@/lib/cf-env';
 import {cookies,headers} from 'next/headers';
-import type {ChatGPTUser} from '@/app/chatgpt-auth';
+import type {ChatGPTIdentity} from './chatgpt-identity';
+import {env} from './cf-env';
 import type {Profile} from './love-types';
 
-export class AuthError extends Error{constructor(public status:number,message:string){super(message);}}
+export class AuthError extends Error{
+ status:number;
+ constructor(status:number,message:string){
+  super(message);
+  this.name='AuthError';
+  this.status=status;
+ }
+}
 export const SESSION_COOKIE='__lovelink_session';
+export const SIGN_IN_PATH='/login';
+export const SIGN_OUT_PATH='/signout';
+export const SIGN_OUT_ALIAS_PATH='/signout-with-chatgpt';
+export const REGISTER_PATH='/register';
 const SESSION_DAYS=30;
 const PBKDF2_ITERATIONS=210000;
 const loginAttempts=new Map<string,{count:number;lockedUntil:number}>();
+const RESERVED_AUTH_PATHS=new Set([
+ SIGN_IN_PATH,
+ REGISTER_PATH,
+ '/forgot',
+ '/reset',
+ '/signin-with-chatgpt',
+ SIGN_OUT_PATH,
+ SIGN_OUT_ALIAS_PATH,
+ '/callback',
+]);
 
 function authDb(){if(!env.DB)throw new AuthError(503,'Your saved space is temporarily unavailable. Please try again.');return env.DB;}
 function bytesToHex(bytes:Uint8Array){return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');}
@@ -96,7 +117,54 @@ export async function readSessionTokenFromRequest(request?:Request){
  }
 }
 
-export async function userFromSessionToken(token:string|null|undefined):Promise<ChatGPTUser|null>{
+export async function currentSessionUser(request?:Request){
+ return userFromSessionToken(await readSessionTokenFromRequest(request));
+}
+
+export function safeAuthReturnPath(value:string|null|undefined,fallback='/login'){
+ if(!value||!value.startsWith('/')||value.startsWith('//'))return fallback;
+ let url:URL;
+ try{url=new URL(value,'https://app.local');}catch{return fallback;}
+ if(url.origin!=='https://app.local')return fallback;
+ if(RESERVED_AUTH_PATHS.has(url.pathname))return fallback;
+ return `${url.pathname}${url.search}${url.hash}`;
+}
+
+export function emailSignInPath(returnTo='/'){
+ const next=safeAuthReturnPath(returnTo,'/');
+ return next==='/'?SIGN_IN_PATH:`${SIGN_IN_PATH}?next=${encodeURIComponent(next)}`;
+}
+
+export function emailSignOutPath(returnTo='/login'){
+ return `${SIGN_OUT_PATH}?return_to=${encodeURIComponent(safeAuthReturnPath(returnTo,'/login'))}`;
+}
+
+export function isAuthPrefetch(request:Request){
+ if(request.headers.get('next-router-prefetch')!=null)return true;
+ if(request.headers.get('x-middleware-prefetch')==='1')return true;
+ return [request.headers.get('purpose'),request.headers.get('sec-purpose')].some((value)=>typeof value==='string'&&value.split(/[;,]/).some((part)=>part.trim().toLowerCase()==='prefetch'));
+}
+
+export async function signOutResponse(request:Request,fallback='/login'){
+ if(isAuthPrefetch(request)){
+  return new Response(null,{status:204,headers:{'Cache-Control':'private, no-store'}});
+ }
+ const token=await readSessionTokenFromRequest(request);
+ try{await destroySession(token);}catch{/* still clear the cookie so the browser is signed out */}
+ const url=new URL(request.url);
+ const next=safeAuthReturnPath(url.searchParams.get('next')||url.searchParams.get('return_to'),fallback);
+ const secure=url.protocol==='https:';
+ return new Response(null,{
+  status:request.method==='POST'?303:302,
+  headers:{
+   Location:next,
+   'Cache-Control':'private, no-store',
+   'Set-Cookie':clearSessionCookieHeader(secure),
+  },
+ });
+}
+
+export async function userFromSessionToken(token:string|null|undefined):Promise<ChatGPTIdentity|null>{
  if(!token||token.length<32||token.length>128||!env.DB)return null;
  const tokenHash=await sha256Hex(token);
  const row=await env.DB.prepare(`SELECT s.user_id AS userId, a.email AS email, u.profile_json AS profile

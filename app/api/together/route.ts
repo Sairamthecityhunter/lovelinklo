@@ -14,9 +14,9 @@ async function passports(ctx:Context){
  return {mine,revision:own?.revision||0,partner:other?sharedPassport(passportSchema.parse(JSON.parse(other.data_json))):{}};
 }
 async function plans(ctx:Context){const rows=await db().prepare('SELECT p.* FROM together_plans p JOIN users u ON u.id=p.owner_id AND u.couple_id=p.couple_id WHERE p.couple_id=? ORDER BY p.created_at DESC LIMIT 104').bind(ctx.coupleId).all<any>();return rows.results.map(r=>({...JSON.parse(r.data_json),ownerId:r.owner_id})) as WeeklyPlan[];}
-export async function GET(){try{const ctx=await ensureUser();const [p,items,access]=await Promise.all([passports(ctx),plans(ctx),entitlements(ctx.coupleId)]);return response({...p,plans:items,premium:access.premium,mode:checkoutMode(),week:weekKey(Date.now(),'UTC')});}catch(e){return failure(e);}}
+export async function GET(request:Request){try{const ctx=await ensureUser(request);const [p,items,access]=await Promise.all([passports(ctx),plans(ctx),entitlements(ctx.coupleId)]);return response({...p,plans:items,premium:access.premium,mode:checkoutMode(),week:weekKey(Date.now(),'UTC')});}catch(e){return failure(e);}}
 export async function POST(request:Request){try{
- guard(request);const ctx=await ensureUser(),body=await jsonBody(request,12000),database=db();
+ guard(request);const ctx=await ensureUser(request),body=await jsonBody(request,12000),database=db();
  if(body.op==='passport'){
   const value=passportSchema.parse(body.value),revision=z.number().int().min(0).parse(body.revision);
   const result=revision===0?await database.prepare('INSERT INTO together_passports (owner_id,couple_id,data_json,revision) VALUES (?,?,?,1) ON CONFLICT(owner_id) DO NOTHING').bind(ctx.userId,ctx.coupleId,JSON.stringify(value)).run():await database.prepare('UPDATE together_passports SET data_json=?,couple_id=?,revision=revision+1 WHERE owner_id=? AND revision=?').bind(JSON.stringify(value),ctx.coupleId,ctx.userId,revision).run();

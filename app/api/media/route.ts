@@ -2,7 +2,7 @@ import {ApiError,db,storage,ensureUser,guard,response,failure} from '@/lib/serve
 import {detectMedia} from '@/lib/media';
 import {assertRateLimit} from '@/lib/rate-limit';
 export async function POST(request:Request){try{
- guard(request);const ctx=await ensureUser();await assertRateLimit('media:upload:'+ctx.userId,30,60*60*1000);const max=31*1024*1024;
+ guard(request);const ctx=await ensureUser(request);await assertRateLimit('media:upload:'+ctx.userId,30,60*60*1000);const max=31*1024*1024;
  if(Number(request.headers.get('content-length'))>max)throw new ApiError(413,'Choose a file up to 30 MB.');
  const reader=request.body?.getReader();if(!reader)throw new ApiError(400,'Choose a file.');
  const chunks:Uint8Array[]=[];let length=0;

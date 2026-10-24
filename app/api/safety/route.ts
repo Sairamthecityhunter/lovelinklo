@@ -33,9 +33,9 @@ async function safetyPayload(ctx: {userId: string; coupleId: string}) {
   };
 }
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     return response(await safetyPayload(ctx));
   } catch (e) {
     return failure(e);
@@ -45,7 +45,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const body = await jsonBody(request, 4000);
     const database = db();
     if (body.op === 'block') {
