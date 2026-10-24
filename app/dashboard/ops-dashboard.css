@@ -29,8 +29,16 @@
 .ops-gate-card{padding:24px;display:grid;gap:16px}
 @media(max-width:860px){
  .ops-main{padding:24px 16px 40px}
- .ops-summary,.ops-grid,.ops-split,.ops-pair{grid-template-columns:1fr}
+ .ops-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ops-grid,.ops-split,.ops-pair{grid-template-columns:1fr}
  .ops-span{grid-column:auto}
- .ops-top{padding:14px 16px}
- .ops-foot{flex-direction:column}
+ .ops-top{padding:14px 16px;flex-wrap:wrap}
+ .ops-top .brand-logo-wordmark{height:44px;max-width:200px}
+ .ops-main .page-heading{flex-wrap:wrap;align-items:flex-start;gap:12px}
+ .ops-via{white-space:normal}
+ .ops-foot{flex-direction:column;align-items:flex-start}
+ .ops-card{padding:20px 18px}
+ .ops-card h2{font-size:20px;flex-wrap:wrap}
+ .ops-gate-card .button-row{flex-direction:column;align-items:stretch}
+ .ops-gate-card .primary-button,.ops-gate-card .outline-button{width:100%;justify-content:center;min-height:44px}
 }

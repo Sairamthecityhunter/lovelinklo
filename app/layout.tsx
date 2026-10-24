@@ -3,6 +3,7 @@ import {publicAppUrl} from '@/lib/app-url';
 import './globals.css';
 import './love-design.css';
 import './auth.css';
+import './love-mobile.css';
 
 const site=publicAppUrl();
 const description='A private couple website: pin little loves, keep memories, share a timeline, and stay close wherever you are.';

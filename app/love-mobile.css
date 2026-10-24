@@ -1,0 +1,349 @@
+/* Full-app mobile pass. Layout, type, and tap targets only — no product behavior. */
+
+html{overflow-x:clip;scroll-padding-bottom:96px}
+body{overflow-x:clip}
+
+@media(max-width:767px){
+ /* Comfortable tap targets and readable type across every surface. */
+ body{font-size:16px}
+ body .primary-button,
+ body .outline-button,
+ body .danger-button,
+ body .seller-primary,
+ body .seller-secondary,
+ body .landing-primary,
+ body .landing-nav-link{
+  min-height:44px;
+  padding:11px 16px;
+  white-space:normal;
+ }
+ body .text-button{min-height:40px;padding:8px 4px}
+ .app-shell .topbar .icon-button,
+ .app-shell .mobile-trigger,
+ .topbar .avatar,
+ .photo-control,
+ .product-heart,
+ .calendar-selection-heading>.icon-button,
+ .emoji-calendar .calendar-toolbar .icon-button{
+  min-width:44px;
+  min-height:44px;
+  width:44px;
+  height:44px;
+ }
+ .app-shell .pin-check,
+ .full-pins .pin-check,
+ .app-shell .pin-row .pin-check{
+  min-width:36px;
+  min-height:36px;
+  width:36px;
+  height:36px;
+ }
+ .filter-chips button,
+ .mood-row button,
+ .world-destinations button,
+ .world-demo-prompts button{
+  min-height:44px;
+ }
+ .app-shell [data-slot=tabs-trigger],
+ .together-tabs [data-slot=tabs-trigger],
+ .shop-tabs [data-slot=tabs-trigger],
+ .concierge-tabs [data-slot=tabs-trigger],
+ .seller-tabs [data-slot=tabs-trigger],
+ .couple-games-tabs [data-slot=tabs-trigger]{
+  min-height:44px;
+  font-size:14px;
+ }
+ body .love-form input:not([type=checkbox]),
+ body .love-form textarea,
+ body .love-form select,
+ .auth-card input,
+ .seller-site input:not([type=checkbox]),
+ .seller-site textarea,
+ .together-view input:not([type=checkbox]),
+ .together-view textarea,
+ .concierge-form input,
+ .concierge-form textarea,
+ .invite-code-field input,
+ .ops-gate-card input,
+ .password-change input,
+ .search-input input{
+  font-size:16px;
+ }
+
+ /* App chrome: hamburger + bottom bar, safe areas, no clipped footer. */
+ .app-shell{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+ .app-shell .topbar{height:auto;min-height:56px;padding:8px max(16px,env(safe-area-inset-right)) 8px max(16px,env(safe-area-inset-left));gap:10px}
+ .app-shell .breadcrumb{min-width:0}
+ .app-shell .breadcrumb strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:42vw}
+ .app-shell .main-content{padding:20px max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
+ .app-shell .page-heading,
+ .ops-main .page-heading,
+ .concierge .page-heading,
+ .gift-center .page-heading{
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:14px;
+ }
+ .app-shell .page-heading>.primary-button,
+ .app-shell .page-heading>.outline-button,
+ .gift-center .page-heading>.outline-button,
+ .concierge .page-heading>.outline-button{
+  width:100%;
+  justify-content:center;
+ }
+ .app-shell .page-heading h1,
+ .app-shell .concierge .page-heading h1,
+ .ops-main .page-heading h1{
+  font-size:clamp(1.7rem,7vw,2rem);
+  letter-spacing:-.03em;
+ }
+ .app-shell .today-heading h1{font-size:clamp(1.9rem,8vw,2.25rem)}
+ .app-shell .section-title{flex-wrap:wrap;align-items:flex-start;gap:10px}
+ .app-shell .page-footer{padding-bottom:calc(112px + env(safe-area-inset-bottom));gap:12px}
+ .app-shell .demo-note{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+ .app-shell .mobile-nav{
+  display:flex;
+  left:max(10px,env(safe-area-inset-left));
+  right:max(10px,env(safe-area-inset-right));
+  bottom:max(10px,env(safe-area-inset-bottom));
+  min-height:68px;
+  padding:8px 4px 6px;
+  gap:2px;
+  z-index:40;
+ }
+ .app-shell .mobile-nav button{
+  flex:1;
+  min-width:0;
+  min-height:52px;
+  font-size:11px;
+  gap:4px;
+  padding:6px 2px;
+ }
+ :is(.love-sidebar,[data-mobile=true][data-slot=sidebar]) .nav-item{height:44px;min-height:44px}
+ :is(.love-sidebar,[data-mobile=true][data-slot=sidebar]) .settings-nav,
+ :is(.love-sidebar,[data-mobile=true][data-slot=sidebar]) .account-button,
+ :is(.love-sidebar,[data-mobile=true][data-slot=sidebar]) .distance-toggle{min-height:44px}
+ :is(.love-sidebar,[data-mobile=true][data-slot=sidebar]) .space-picker{min-height:52px}
+
+ /* Home, wishlist, pins, and shared cards. */
+ .home-highlight-grid,
+ .home-organize-grid,
+ .home-discover,
+ .settings-grid,
+ .letter-grid,
+ .memory-grid,
+ .plans-grid,
+ .surprise-grid,
+ .couple-space-grid{grid-template-columns:1fr}
+ .home-shortcuts{grid-template-columns:1fr 1fr}
+ .home-gifts .home-products{grid-template-columns:1fr 1fr}
+ .product-grid{grid-template-columns:1fr;gap:16px}
+ .product-card .button-row,
+ .letter-card .button-row,
+ .goal-card .button-row,
+ .welcome-hero .button-row,
+ .detail-content .button-row,
+ .billing-card .button-row,
+ .billing-space-card .button-row,
+ .ops-gate-card .button-row,
+ .form-actions,
+ .wish-actions{flex-direction:column;align-items:stretch}
+ .product-card .button-row>button,
+ .wish-actions>button,
+ .form-actions>button,
+ .billing-card .button-row>a,
+ .billing-card .button-row>button,
+ .billing-space-card .button-row>button{width:100%;justify-content:center}
+ .priority-actions{flex-wrap:wrap}
+ .priority-actions .primary-button,
+ .priority-actions .outline-button{flex:1 1 140px;min-height:44px}
+ .connection-strip{flex-wrap:wrap}
+ .connection-strip p{max-width:none}
+ .pins-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .soft-banner,
+ .gift-concierge,
+ .year-review{flex-direction:column;align-items:stretch}
+ .soft-banner>button,
+ .gift-concierge>button,
+ .gift-concierge>a{width:100%;margin:0;justify-content:center}
+ .list-toolbar{flex-direction:column;align-items:stretch}
+ .gift-filters{flex-direction:column;align-items:stretch}
+ .gift-filters .search-input,
+ .gift-filters>.choice{max-width:none;width:100%}
+ .order-card{flex-wrap:wrap}
+ .welcome-hero{padding:28px 20px;min-height:380px}
+ .welcome-hero h1{font-size:clamp(2.2rem,10vw,3.1rem)}
+ .quick-actions{grid-template-columns:1fr}
+ .together-home-link,
+ .billing-home-link{padding:18px 16px;align-items:flex-start}
+ .together-home-link strong,
+ .billing-home-link strong{font-size:17px}
+
+ /* Settings, profile, billing, notes, trips, safety. */
+ .setting-row{flex-wrap:wrap;align-items:flex-start;gap:12px}
+ .setting-row>button,
+ .setting-row>a,
+ .setting-row>.outline-button,
+ .setting-row>.primary-button,
+ .setting-row>.icon-button{margin-left:auto}
+ .setting-row .password-change{width:100%}
+ .password-change .primary-button,
+ .password-change .outline-button,
+ .password-change>div{width:100%}
+ .password-change>div{display:flex;flex-direction:column;gap:10px}
+ .billing-compare{grid-template-columns:1fr}
+ .billing-plan .section-title{align-items:flex-start}
+ .billing-plan .section-title strong{width:100%}
+ .together-history{flex-wrap:wrap;align-items:flex-start;gap:8px}
+ .together-history>button,
+ .together-history>.text-button{min-height:40px}
+ .blocked-list li{flex-wrap:wrap}
+ .blocked-list .outline-button{width:100%}
+ .couple-note{padding:14px 16px;display:grid;gap:8px}
+ .couple-note .icon-button{position:static;justify-self:start}
+ .couple-note .text-button{justify-self:start}
+ .form-grid{grid-template-columns:1fr}
+ .safety-check{align-items:flex-start;min-height:44px}
+
+ /* Calendar, letters, memories, plans, surprises. */
+ .calendar-layout{grid-template-columns:1fr}
+ .emoji-calendar .calendar-date{min-height:64px}
+ .calendar-date-titles{display:none}
+ .memory-card img{height:220px;max-height:42vw;min-height:180px}
+ .goal-card h3{min-height:0;font-size:22px}
+ .year-review .review-stats{width:100%;justify-content:space-between}
+
+ /* Gifts, shop, together, concierge, marketplace. */
+ .concierge-layout,
+ .concierge-grid,
+ .concierge-two,
+ .shop-grid,
+ .shop-received-grid,
+ .together-layout,
+ .together-form-grid,
+ .together-membership,
+ .gift-kind-grid{grid-template-columns:1fr}
+ .together-layout aside{grid-template-columns:1fr}
+ .concierge-budget{grid-template-columns:1fr}
+ .concierge-actions{flex-direction:column}
+ .concierge-actions>button,
+ .concierge-actions>a,
+ .together-actions>button,
+ .together-actions>a,
+ .shop-checkout-row>button,
+ .shop-checkout-row>a,
+ .shop-premium-banner>button{width:100%;justify-content:center}
+ .shop-premium-banner{flex-direction:column;align-items:flex-start}
+ .shop-tabs,
+ .together-tabs,
+ .concierge-tabs,
+ .seller-tabs{width:100%}
+ .marketplace-order .button-row button{width:100%}
+ .gift-physical-status{padding:22px 18px}
+ .seller-customer-catalog .section-title{align-items:stretch}
+ .seller-customer-catalog .choice{width:100%}
+
+ /* Games and world. */
+ .quiz-decks,
+ .couple-game-options,
+ .game-answer-reveal{grid-template-columns:1fr}
+ .world-layout,
+ .world-side{grid-template-columns:1fr}
+ .world-canvas{height:min(58vw,360px);min-height:280px}
+ .world-direction-pad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px)}
+ .world-camera-controls button{min-width:44px;min-height:44px}
+ .world-call-controls button,
+ .world-incoming button{min-height:44px;flex:1 1 140px}
+ .world-video-grid{grid-template-columns:1fr}
+ .world-chat form{flex-wrap:wrap}
+ .world-chat form button{min-height:44px;flex:1}
+ .memory-board{gap:8px}
+ .game-actions{flex-direction:column;align-items:stretch}
+
+ /* Dialogs, sheets, editors. */
+ body .love-dialog{
+  width:calc(100vw - 16px)!important;
+  max-width:calc(100vw - 16px)!important;
+  max-height:calc(100dvh - 16px);
+  padding:22px 18px!important;
+ }
+ body .love-dialog [data-slot=dialog-title]{font-size:22px;padding-right:28px}
+ .pin-type-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .pin-type-grid button,
+ .pin-type-option{min-height:56px}
+ .product-detail-top{grid-template-columns:1fr}
+ .notification-sheet{min-width:0;width:100%!important;max-width:none!important}
+ .notification-item{align-items:flex-start}
+
+ /* Landing, auth, invite, legal, errors. */
+ .landing-nav{padding:14px 16px;gap:10px}
+ .landing-logo{height:48px;max-width:min(220px,58vw)}
+ .landing-cta{width:100%;align-items:stretch}
+ .landing-cta .landing-primary,
+ .landing-cta .primary-button,
+ .landing-close .primary-button{width:100%;justify-content:center}
+ .landing-moments{grid-template-columns:1fr;padding-inline:16px}
+ .landing-footer{flex-direction:column;align-items:flex-start;gap:12px;padding:22px 16px 28px}
+ .auth-split{grid-template-columns:1fr}
+ .auth-visual{min-height:168px;max-height:28vh}
+ .auth-visual-copy{padding:18px}
+ .auth-visual-logo{height:52px;max-width:220px}
+ .auth-panel{padding:22px 16px 36px}
+ .auth-brand .brand-logo-wordmark{height:48px;max-width:220px}
+ .legal-nav{padding:14px 16px;gap:10px;flex-wrap:wrap}
+ .legal-nav .brand-logo-wordmark{height:44px;max-width:200px}
+ .legal-article{padding:8px 16px 48px}
+ .invite-page{padding:16px}
+ .invite-card{padding:28px 20px;width:100%}
+ .invite-card h1{font-size:28px}
+ .invite-card .primary-button{width:100%;justify-content:center}
+
+ /* Seller portal and ops dashboard. */
+ .seller-header{height:auto;min-height:64px;padding:10px 16px;flex-wrap:wrap;gap:10px}
+ .seller-header>div{flex-wrap:wrap;gap:10px}
+ .seller-header>div>a:first-child{display:inline-flex}
+ .seller-brand-logo{height:44px;max-width:180px}
+ .seller-main{padding:24px 16px 36px}
+ .seller-heading{flex-direction:column;align-items:stretch}
+ .seller-heading h1{font-size:clamp(1.8rem,8vw,2.25rem)}
+ .seller-two-columns,
+ .seller-workspace-grid,
+ .seller-form-grid{grid-template-columns:1fr}
+ .seller-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .seller-actions>*{width:100%;justify-content:center}
+ .seller-gate{flex-direction:column;align-items:flex-start}
+ .seller-gate strong{text-align:left;max-width:none}
+ .seller-launch-badge{width:100%}
+ .ops-top{padding:12px 16px;flex-wrap:wrap}
+ .ops-top .brand-logo-wordmark{height:40px;max-width:180px}
+ .ops-main{padding:22px 16px 40px}
+ .ops-main .page-heading{align-items:flex-start}
+ .ops-via{white-space:normal}
+ .ops-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+ .ops-summary>div{display:grid;align-items:start;padding:16px 12px}
+ .ops-grid,
+ .ops-split,
+ .ops-pair{grid-template-columns:1fr}
+ .ops-span{grid-column:auto}
+ .ops-foot{flex-direction:column;align-items:flex-start}
+ .ops-gate-card .primary-button,
+ .ops-gate-card .outline-button{width:100%;justify-content:center}
+}
+
+@media(max-width:479px){
+ .home-shortcuts{grid-template-columns:1fr}
+ .home-gifts .home-products,
+ .ops-summary,
+ .seller-stat-grid,
+ .pins-summary{grid-template-columns:1fr}
+ .couple-clocks{grid-template-columns:1fr}
+ .couple-clocks>div:last-child{border-left:0;padding-left:0;border-top:1px solid #ffffff30;padding-top:12px}
+ .world-destinations{grid-template-columns:1fr}
+ .pin-type-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media(max-width:370px){
+ .app-shell .main-content{padding-inline:12px}
+ .app-shell .mobile-nav button{font-size:10px}
+ .landing-logo{max-width:52vw}
+}

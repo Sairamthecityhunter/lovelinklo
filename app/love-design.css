@@ -71,5 +71,9 @@ body .love-dialog{border-radius:24px!important;border:1px solid var(--border);bo
 .invite-code-field input{border:1px solid var(--border);border-radius:10px;padding:12px;font:inherit;letter-spacing:.08em;text-transform:uppercase}
 @media(max-width:767px){
  .couple-space-grid{grid-template-columns:1fr}
- .couple-hero-card h2{font-size:36px}
+ .couple-hero-card h2{font-size:clamp(1.8rem,8vw,2.15rem)}
+ .mood-row button{min-height:44px}
+ .couple-note{padding:14px 16px}
+ .couple-note .icon-button{position:static;min-width:44px;min-height:44px}
+ .invite-code-field input{min-height:44px;font-size:16px}
 }

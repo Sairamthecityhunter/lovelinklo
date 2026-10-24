@@ -50,10 +50,13 @@ body .landing-primary:hover{filter:none;background:#f3e8ee;transform:translateY(
  .landing-moment,.landing-moment img{min-height:220px}
 }
 @media(max-width:640px){
- .landing-nav{padding:16px 18px}
- .landing-logo{height:56px;max-width:280px}
- .landing-hero-copy{padding-bottom:40px}
- .landing-cta{flex-direction:column;align-items:flex-start}
+ .landing-nav{padding:14px 16px;gap:10px}
+ .landing-logo{height:48px;max-width:min(240px,58vw)}
+ .landing-nav-link{min-height:44px;display:inline-flex;align-items:center}
+ .landing-hero-copy{padding:0 16px 36px}
+ .landing-cta{flex-direction:column;align-items:stretch;width:100%}
+ .landing-cta .landing-primary,.landing-close .primary-button{width:100%;justify-content:center;min-height:44px}
+ .landing-section{padding-inline:16px}
 }
 
 /* Auth split */
@@ -85,10 +88,13 @@ body .landing-primary:hover{filter:none;background:#f3e8ee;transform:translateY(
 
 @media(max-width:900px){
  .auth-split{grid-template-columns:1fr}
- .auth-visual{min-height:220px;max-height:34vh}
- .auth-visual-copy{padding:24px;justify-content:flex-end}
+ .auth-visual{min-height:180px;max-height:30vh}
+ .auth-visual-copy{padding:20px;justify-content:flex-end}
  .auth-visual-copy p{font-size:1rem;max-width:32ch}
- .auth-panel{padding:28px 20px 40px;align-content:start}
+ .auth-visual-logo{height:56px;max-width:240px}
+ .auth-panel{padding:24px 16px 40px;align-content:start}
+ .auth-card input{min-height:44px;font-size:16px}
+ .auth-card .primary-button{min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){
  .landing-hero-media,.landing-nav,.landing-hero-copy,.landing-moment img{animation:none!important;transition:none!important;transform:none!important}
