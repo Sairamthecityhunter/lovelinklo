@@ -17,6 +17,7 @@ A working couples website and installable progressive web app. Love Wish Pins ar
 - `/settings`: profile, partner invitations, LoveLink Free vs Plus billing, long-distance mode, dark mode, notification controls, content export/clear, account deletion, disconnect, install guidance, and explicit integration status.
 - `/about`: the LoveLink introduction and entry into the working app.
 - `/invite`: authenticated, explicit partner acceptance. Private site access is separate from couple membership.
+- `/dashboard`: owner-gated operations analytics (push, closeness, notes, calendar, trips, gift orders). Not public.
 
 ## Architecture
 
@@ -44,6 +45,8 @@ The main UI and forms are in `app/lovelink.tsx`, `app/love-forms.tsx`, and `app/
 | GET `/api/media/:id` | Authorize ownership, a shared memory, or an unlocked shared surprise; support bounded byte ranges for playback |
 | POST `/api/ai` | Consent-gated AI request, with hourly request limiting and no hidden partner data |
 | POST `/api/reminders/process` | Authenticated job endpoint for an external reminder scheduler and notification gateway |
+| GET `/dashboard` | Owner-gated operations dashboard: push, closeness, notes, calendar, trips, gift orders |
+| GET `/api/dashboard` | Same snapshot as JSON. `Authorization: Bearer <DASHBOARD_SECRET>` or a signed-in owner/admin session |
 
 ### Authorization and privacy
 
@@ -103,6 +106,9 @@ Set these on the `lovelinklos` Vercel project (Production and Preview):
 | `VAPID_PRIVATE_KEY` | Optional. Web Push private key. |
 | `VAPID_SUBJECT` | Optional. `mailto:` or `https:` contact used as the VAPID subject. |
 | `CRON_SECRET` | Protects `GET`/`POST` `/api/cron/reminders`. Vercel Cron sends it as `Authorization: Bearer`. |
+| `DASHBOARD_SECRET` | Optional. Password for `/dashboard` and `/api/dashboard`. Required on Vercel unless the signed-in user is the site owner or listed in `DASHBOARD_ADMIN_EMAILS`. Generate with `openssl rand -base64 24`. |
+| `DASHBOARD_ADMIN_EMAILS` | Optional. Comma-separated account emails allowed to open the operations dashboard. |
+| `DASHBOARD_OWNER_ID` | Optional. Overrides the site-owner user id from `lib/concierge-operator.ts`. |
 | `SHOP_ENABLED` | Optional. Set `true` only with `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to leave demo billing. |
 | `STRIPE_SECRET_KEY` | Optional. Stripe secret (`sk_test_…` or `sk_live_…`). Plus and gift installments stay demo-mode without it. |
 | `STRIPE_WEBHOOK_SECRET` | Optional. Signed webhook secret for `/api/shop/webhook`. |
@@ -116,6 +122,35 @@ Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unch
 3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`–`0007`).
 4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
 5. Confirm `/register`, `/us` invite+accept, and creating a wish pin survive a reload.
+
+## Operations dashboard
+
+`/dashboard` is a private operations view. It is not indexed and is not part of the public couple site. It reads existing tables only — no new migration.
+
+At a glance it shows:
+
+- Push subscription and subscriber counts (`push_subscriptions`)
+- Closeness level distribution across directed rows and paired couples (`closeness`)
+- Love notes sent / scheduled / draft (`couple_notes`)
+- Upcoming calendar events and special days (`calendar_events`, `special_days`)
+- Active travel trips (`couple_trips`)
+- Gift-order status breakdown (`gift_orders`)
+
+Note bodies, shipping addresses, emails, and push endpoints are not returned.
+
+### Access gate
+
+On Vercel production or preview, one of these must be true:
+
+1. `DASHBOARD_SECRET` is set (8+ characters) and submitted on the unlock form, sent as cookie `__lovelink_ops`, or passed as `Authorization: Bearer <DASHBOARD_SECRET>` / `X-Dashboard-Secret` to `/api/dashboard`
+2. The visitor is signed in as the site owner (`lib/concierge-operator.ts`, or `DASHBOARD_OWNER_ID`)
+3. The signed-in account email is listed in `DASHBOARD_ADMIN_EMAILS`
+
+Locally (no `VERCEL_ENV`), any signed-in account can open `/dashboard` so `pnpm dev` works without extra secrets. Set `DASHBOARD_SECRET` anyway if you want the password form. This branch uses the same Postgres/`DATABASE_URL` adapter as the rest of the app; there is no separate SQLite path on current `main`.
+
+### Site links
+
+The signed-in LoveLink sidebar, page footer, and Settings → Connected services link to `/dashboard`. The dashboard header links **Back to LoveLink**: `https://lovelinklos.vercel.app` when `VERCEL_ENV=production`, otherwise same-origin `/`.
 
 ## Development
 
@@ -131,7 +166,7 @@ pnpm dev
 
 ### Validation
 
-- `pnpm test:unit` or `node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/couple-trips.test.mjs tests/gift-orders.test.mjs tests/payment-plans.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases), closeness unlock rules (100/50/25 notes, calendar, and push), trip split/date rules, gift catalog payment hooks, and payment-plan split/gating helpers.
+- `pnpm test:unit` or `node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/couple-trips.test.mjs tests/gift-orders.test.mjs tests/payment-plans.test.mjs tests/ops-dashboard.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases), closeness unlock rules (100/50/25 notes, calendar, and push), trip split/date rules, gift catalog payment hooks, payment-plan split/gating helpers, and operations-dashboard gate/aggregation helpers.
 - `pnpm exec tsc --noEmit`: typed application and route checks.
 - After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, partner block/report (unlink, rejected re-pair both ways, flagged report), push/closeness/special-day reminders (subscribe/unsubscribe, note targeting, draft/send gating, calendar unlocks, scheduled notes, reminder timing, cron dedupe and auth, quiet block cleanup), trips, catalog gift orders, and payment-plan happy paths (demo Plus, 3-part split, partner contribution, paid gift). Test identities are synthetic. Soft closeness decay after quiet days is intentionally left as follow-up work.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
