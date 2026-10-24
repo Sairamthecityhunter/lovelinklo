@@ -1,5 +1,6 @@
+import {soloProfileAfterUnlink, UNLINK_OWNER_COUPLE_UPDATES} from '@/lib/account-lifecycle';
 import type {Profile} from '@/lib/love-types';
-import {ApiError,db,tables} from '@/lib/server';
+import {ApiError,db} from '@/lib/server';
 import {deliverPush} from '@/lib/web-push';
 
 export type SafetyTarget = {userId: string; name: string};
@@ -27,24 +28,50 @@ export async function pairingBlocked(a: string, b: string) {
   return !!row;
 }
 
-export async function unlinkFromPartner(ctx: {userId: string; coupleId: string}) {
+export async function unlinkFromPartner(ctx: {userId: string; coupleId: string; profile?: Profile}) {
   const database = db();
-  const nextCoupleId = crypto.randomUUID();
+  const leftoverCoupleId = ctx.coupleId;
+  const partner = await currentPartner(ctx);
   const now = new Date().toISOString();
+  if (!partner) {
+    await database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(leftoverCoupleId).run();
+    return leftoverCoupleId;
+  }
+
+  const mine = await database.prepare('SELECT profile_json FROM users WHERE id = ?').bind(ctx.userId).first<{profile_json: string}>();
+  const leftover = await database.prepare('SELECT profile_json FROM users WHERE id = ?').bind(partner.userId).first<{profile_json: string}>();
+  let myProfile = ctx.profile;
+  try {myProfile = myProfile || JSON.parse(mine?.profile_json || '{}') as Profile;} catch {myProfile = ctx.profile;}
+  let leftoverProfile: Profile | null = null;
+  try {leftoverProfile = leftover ? JSON.parse(leftover.profile_json) as Profile : null;} catch {leftoverProfile = null;}
+  const mySolo = soloProfileAfterUnlink(myProfile || {myName:'You',partnerName:'Your partner',myTimezone:'UTC',partnerTimezone:'UTC',togetherSince:'',longDistance:false,browserNotifications:false,notificationPrivacy:true,sample:false,interests:'',budget:0,location:''});
+  const leftoverSolo = leftoverProfile ? soloProfileAfterUnlink(leftoverProfile) : null;
+  const nextCoupleId = crypto.randomUUID();
+
   await database.batch([
     database.prepare('INSERT INTO couples (id,owner_id,created_at) VALUES (?,?,?)').bind(nextCoupleId, ctx.userId, now),
-    database.prepare('UPDATE users SET couple_id = ? WHERE id = ?').bind(nextCoupleId, ctx.userId),
+    database.prepare('UPDATE users SET couple_id = ?, profile_json = ?, updated_at = ? WHERE id = ?').bind(nextCoupleId, JSON.stringify(mySolo), now, ctx.userId),
+    ...(leftoverSolo ? [
+      database.prepare('UPDATE users SET profile_json = ?, updated_at = ? WHERE id = ?').bind(JSON.stringify(leftoverSolo), now, partner.userId),
+    ] : []),
+    database.prepare('UPDATE couples SET owner_id = ? WHERE id = ? AND owner_id = ?').bind(partner.userId, leftoverCoupleId, ctx.userId),
+    database.prepare('UPDATE shop_world_settings SET owner_id = ? WHERE couple_id = ? AND owner_id = ?').bind(partner.userId, leftoverCoupleId, ctx.userId),
+    database.prepare('UPDATE couple_plans SET started_by = ? WHERE couple_id = ? AND started_by = ?').bind(partner.userId, leftoverCoupleId, ctx.userId),
     database.prepare('DELETE FROM world_sessions WHERE user_id = ?').bind(ctx.userId),
-    ...Object.values(tables).map((t) => database.prepare(`UPDATE ${t} SET couple_id = ? WHERE owner_id = ?`).bind(nextCoupleId, ctx.userId)),
-    database.prepare('UPDATE media SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
-    database.prepare('UPDATE couple_notes SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
-    database.prepare('UPDATE couple_trips SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
-    database.prepare('UPDATE gift_orders SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
-    database.prepare('UPDATE gift_payment_plans SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
-    database.prepare('UPDATE daily_answers SET couple_id = ? WHERE user_id = ?').bind(nextCoupleId, ctx.userId),
-    database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(ctx.coupleId),
+    ...UNLINK_OWNER_COUPLE_UPDATES.map(({table, ownerColumn}) =>
+      database.prepare(`UPDATE ${table} SET couple_id = ? WHERE ${ownerColumn} = ?`).bind(nextCoupleId, ctx.userId),
+    ),
+    database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(leftoverCoupleId),
+    database.prepare('DELETE FROM closeness WHERE (owner_user_id = ? AND target_user_id = ?) OR (owner_user_id = ? AND target_user_id = ?)').bind(ctx.userId, partner.userId, partner.userId, ctx.userId),
+    database.prepare(
+      `DELETE FROM sent_reminders WHERE special_day_id IN (
+         SELECT id FROM special_days WHERE (owner_user_id = ? AND person_user_id = ?) OR (owner_user_id = ? AND person_user_id = ?)
+       )`,
+    ).bind(ctx.userId, partner.userId, partner.userId, ctx.userId),
+    database.prepare('DELETE FROM special_days WHERE (owner_user_id = ? AND person_user_id = ?) OR (owner_user_id = ? AND person_user_id = ?)').bind(ctx.userId, partner.userId, partner.userId, ctx.userId),
   ]);
   ctx.coupleId = nextCoupleId;
+  if (ctx.profile) Object.assign(ctx.profile, mySolo);
   return nextCoupleId;
 }
 

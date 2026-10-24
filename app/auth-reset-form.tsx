@@ -9,6 +9,7 @@ export function ForgotForm() {
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [resetUrl, setResetUrl] = useState('');
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -20,8 +21,9 @@ export function ForgotForm() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({email}),
       });
-      const data: {error?: string} = await r.json();
+      const data: {error?: string; resetUrl?: string} = await r.json();
       if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+      setResetUrl(data.resetUrl || '');
       setDone(true);
     } catch (err) {
       setError((err as Error).message);
@@ -48,7 +50,12 @@ export function ForgotForm() {
           <p className="eyebrow">Password help</p>
           <h1>Forgot your password?</h1>
           {done ? (
-            <p className="auth-lead">If that email has a LoveLink account, we sent a reset link. It expires in one hour. Check spam if you don’t see it—password email needs the site’s email provider to be connected.</p>
+            <>
+              <p className="auth-lead">If that email has a LoveLink account, we sent a reset link. It expires in one hour. Check spam if you don’t see it—password email needs the site’s email provider to be connected.</p>
+              {resetUrl && (
+                <p className="auth-lead">Email isn’t connected on this local site, so you can open this one-hour link now: <a href={resetUrl}>Reset your password</a></p>
+              )}
+            </>
           ) : (
             <>
               <p className="auth-lead">Enter the email you used to register. We’ll send a reset link if an account exists.</p>
@@ -67,12 +74,17 @@ export function ForgotForm() {
 export function ResetForm({token}:{token:string}) {
   const router = useRouter();
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
+    if (password !== confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
     setBusy(true);
     try {
       const r = await fetch('/api/auth/reset', {
@@ -114,6 +126,7 @@ export function ResetForm({token}:{token:string}) {
             <>
               <p className="auth-lead">Use at least 8 characters. You’ll be signed in after saving.</p>
               <label>New password<input required type="password" minLength={8} maxLength={128} value={password} onChange={(e)=>setPassword(e.target.value)} autoComplete="new-password"/></label>
+              <label>Confirm password<input required type="password" minLength={8} maxLength={128} value={confirm} onChange={(e)=>setConfirm(e.target.value)} autoComplete="new-password"/></label>
               {error && <p className="auth-error" role="alert">{error}</p>}
               <button className="primary-button" disabled={busy}>{busy ? 'Saving…' : 'Save password'}</button>
             </>

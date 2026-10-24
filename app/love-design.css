@@ -77,3 +77,6 @@ body .love-dialog{border-radius:24px!important;border:1px solid var(--border);bo
  .couple-note .icon-button{position:static;min-width:44px;min-height:44px}
  .invite-code-field input{min-height:44px;font-size:16px}
 }
+
+.delete-confirm{display:grid;gap:8px;margin:12px 0 4px;font-size:14px;font-weight:550}
+.delete-confirm input{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--card);color:var(--foreground)}

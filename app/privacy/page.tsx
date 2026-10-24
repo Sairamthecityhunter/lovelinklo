@@ -22,7 +22,7 @@ export default function PrivacyPage() {
       <h2>Optional services</h2>
       <p>Password-reset email is sent only if an email provider is configured. AI suggestions, payments, and closed-app reminders run only when those services are connected and you take an explicit action. We do not sell your personal information.</p>
       <h2>Retention and deletion</h2>
-      <p>You can export visible JSON from Settings, clear your saved content, disconnect or block a partner, report abuse, or delete your account. A report records the reason you chose; we do not show the reporter’s identity to the reported person. Financial order records may be retained separately for payment reconciliation when shop features are enabled.</p>
+      <p>You can download a JSON copy of your own account data from Settings, clear your saved content, unlink or block a partner, report abuse, or permanently delete your account after typing DELETE. Unlink resets pairing so both people can invite someone new. Delete removes this account and signs you out; your partner keeps their own items. A report records the reason you chose; we do not show the reporter’s identity to the reported person. Financial order records may be retained separately for payment reconciliation when shop features are enabled.</p>
       <h2>Contact</h2>
       <p>Questions about this policy can be sent to the site operator who hosts your LoveLink deployment.</p>
     </LegalPage>
