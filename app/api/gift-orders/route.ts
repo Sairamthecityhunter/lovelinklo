@@ -139,11 +139,22 @@ export async function POST(request: Request) {
     const database = db();
     if (body.op === 'cancel') {
       const parsed = cancelSchema.parse(body);
+      const paidPart = await database.prepare(
+        `SELECT i.id FROM gift_plan_installments i
+         JOIN gift_payment_plans p ON p.id = i.plan_id
+         WHERE p.gift_order_id = ? AND p.couple_id = ? AND i.status = 'paid' LIMIT 1`,
+      ).bind(parsed.id, ctx.coupleId).first();
+      if (paidPart) throw new ApiError(409, 'A payment already landed on this gift plan, so the order stays open.');
+      const now = new Date().toISOString();
       const result = await database.prepare(
         `UPDATE gift_orders SET status = 'cancelled', updated_at = ?
          WHERE id = ? AND couple_id = ? AND owner_id = ? AND status = 'pending_payment'`,
-      ).bind(new Date().toISOString(), parsed.id, ctx.coupleId, ctx.userId).run();
+      ).bind(now, parsed.id, ctx.coupleId, ctx.userId).run();
       if (!result.meta.changes) throw new ApiError(404, 'That gift order cannot be cancelled.');
+      await database.prepare(
+        `UPDATE gift_payment_plans SET status = 'cancelled', updated_at = ?
+         WHERE gift_order_id = ? AND couple_id = ? AND status = 'active'`,
+      ).bind(now, parsed.id, ctx.coupleId).run();
       return response(await listOrders(ctx));
     }
     if (body.op === 'confirm') {
