@@ -18,6 +18,18 @@ export type HeaderTrustEnv = {
   VERCEL_ENV?: string;
 };
 
+function envString(env: object, name: string): string | undefined {
+  const value = (env as Record<string, unknown>)[name];
+  return typeof value === "string" ? value : undefined;
+}
+
+function headerTrustSignals(env: object): HeaderTrustEnv {
+  return {
+    VERCEL: envString(env, "VERCEL"),
+    VERCEL_ENV: envString(env, "VERCEL_ENV"),
+  };
+}
+
 /**
  * Vercel (production, preview, and `vercel dev`) accepts arbitrary client
  * request headers. Trusting `oai-authenticated-user-*` there is
@@ -26,11 +38,10 @@ export type HeaderTrustEnv = {
  * sign-in and does not set `VERCEL`, so the header fallback stays available
  * only on that non-Vercel path.
  */
-export function trustChatGPTIdentityHeaders(
-  env: HeaderTrustEnv = process.env,
-): boolean {
-  if (env.VERCEL) return false;
-  if (env.VERCEL_ENV === "production" || env.VERCEL_ENV === "preview") {
+export function trustChatGPTIdentityHeaders(env: object = process.env): boolean {
+  const {VERCEL, VERCEL_ENV} = headerTrustSignals(env);
+  if (VERCEL) return false;
+  if (VERCEL_ENV === "production" || VERCEL_ENV === "preview") {
     return false;
   }
   return true;
@@ -62,7 +73,7 @@ export function userFromChatGPTIdentityHeaders(
 export function resolveChatGPTUser(input: {
   sessionUser: ChatGPTIdentity | null;
   requestHeaders: { get(name: string): string | null };
-  env?: HeaderTrustEnv;
+  env?: object;
 }): ChatGPTIdentity | null {
   if (input.sessionUser) return input.sessionUser;
   if (!trustChatGPTIdentityHeaders(input.env ?? process.env)) return null;
