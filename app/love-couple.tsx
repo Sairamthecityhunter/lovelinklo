@@ -9,6 +9,7 @@ import {CHECKIN_MOODS} from '@/lib/daily-prompt';
 import type {Goal,LoveEvent,LoveState,Memory,View} from '@/lib/love-types';
 import {LOCKED_NOTE_COPY,visibilityLabel} from '@/lib/closeness-unlocks';
 import {PartnerNotifySettings,SpecialDaysCard} from './love-notify';
+import {BillingSpaceCard} from './love-billing';
 import {MediaView} from './love-extras';
 
 function SectionTitle({title,sub,action}:{title:string;sub?:string;action?:ReactNode}){
@@ -515,6 +516,7 @@ export function OurSpaceView({
         </div>
       )}
       {error && <p className="form-error" role="alert">{error}</p>}
+      {signedIn && <BillingSpaceCard onNavigate={onNavigate}/>}
       <div className="couple-space-grid">
         <section className="card couple-hero-card">
           <p className="eyebrow">OUR STORY</p>

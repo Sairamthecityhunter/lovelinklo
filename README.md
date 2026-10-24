@@ -14,7 +14,7 @@ A working couples website and installable progressive web app. Love Wish Pins ar
 - `/surprises`: animated digital boxes with a letter, up to eight uploaded media items, an optional HTTPS playlist link, private drafts and scheduled partner access.
 - `/letters`: editable letters, writing prompts, open-when labels, scheduled sharing, and send-later pins.
 - `/plans`: bucket-list dreams, progress, date suggestions, both-timezone daytime hint, and a relationship recap.
-- `/settings`: profile, partner invitations, long-distance mode, dark mode, notification controls, content export/clear, account deletion, disconnect, install guidance, and explicit integration status.
+- `/settings`: profile, partner invitations, LoveLink Free vs Plus billing, long-distance mode, dark mode, notification controls, content export/clear, account deletion, disconnect, install guidance, and explicit integration status.
 - `/about`: the LoveLink introduction and entry into the working app.
 - `/invite`: authenticated, explicit partner acceptance. Private site access is separate from couple membership.
 - `/dashboard`: owner-gated operations analytics (push, closeness, notes, calendar, trips, gift orders). Not public.
@@ -35,6 +35,8 @@ The main UI and forms are in `app/lovelink.tsx`, `app/love-forms.tsx`, and `app/
 | --- | --- |
 | GET `/api/state` | Authenticated, privacy-filtered couple state |
 | GET/POST `/api/couple` | Linked-partner notes and daily check-ins (scoped to `couple_id`) |
+| GET/POST `/api/billing` | Couple Free vs Plus plan. Demo activation when Stripe keys are unset; Stripe Checkout when shop payments are enabled |
+| GET/POST `/api/payment-plans` | Plus-gated gift installment / partner-contribution plans for catalog gift orders |
 | GET/POST `/api/invite` | Create, cancel, or accept a partner invite (link or 8-character code) |
 | POST `/api/auth/forgot` `/api/auth/reset` | Password reset request and token consumption |
 | POST `/api/state` | Validated record/profile changes, completion, snooze, inbox generation, thinking-of-you, clear, disconnect and account deletion |
@@ -107,6 +109,9 @@ Set these on the `lovelinklos` Vercel project (Production and Preview):
 | `DASHBOARD_SECRET` | Optional. Password for `/dashboard` and `/api/dashboard`. Required on Vercel unless the signed-in user is the site owner or listed in `DASHBOARD_ADMIN_EMAILS`. Generate with `openssl rand -base64 24`. |
 | `DASHBOARD_ADMIN_EMAILS` | Optional. Comma-separated account emails allowed to open the operations dashboard. |
 | `DASHBOARD_OWNER_ID` | Optional. Overrides the site-owner user id from `lib/concierge-operator.ts`. |
+| `SHOP_ENABLED` | Optional. Set `true` only with `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to leave demo billing. |
+| `STRIPE_SECRET_KEY` | Optional. Stripe secret (`sk_test_…` or `sk_live_…`). Plus and gift installments stay demo-mode without it. |
+| `STRIPE_WEBHOOK_SECRET` | Optional. Signed webhook secret for `/api/shop/webhook`. |
 
 Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unchanged. Web Push uses `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` when set; if any are missing, LoveLink skips sending and does not error. The hourly special-day job at `/api/cron/reminders` requires `CRON_SECRET`. After provisioning the database, apply schema with `pnpm db:migrate` (or `npm run db:migrate`) using that `DATABASE_URL`. Vercel does not apply migrations automatically.
 
@@ -114,7 +119,7 @@ Optional secrets (`OPENAI_API_KEY`, Stripe, notification gateway, TURN) are unch
 
 1. In the Vercel project **lovelinklos**, set Git to deploy this branch (not `main`).
 2. Add `DATABASE_URL`, `AUTH_SECRET`, and `APP_URL`. Optionally `RESEND_API_KEY` and `EMAIL_FROM` for password-reset email.
-3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`, `0001`, `0002`, `0003`, and `0004`).
+3. From a machine that can reach the database: `pnpm db:migrate` (applies `0000`–`0007`).
 4. Deploy. Framework is Next.js; build command is `next build` (`pnpm build`).
 5. Confirm `/register`, `/us` invite+accept, and creating a wish pin survive a reload.
 
@@ -161,9 +166,9 @@ pnpm dev
 
 ### Validation
 
-- `pnpm test:unit` or `node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/ops-dashboard.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases), closeness unlock rules (100/50/25 notes, calendar, and push), and operations-dashboard gate/aggregation helpers.
+- `pnpm test:unit` or `node --experimental-strip-types --test tests/love-time.test.mjs tests/love-extras.test.mjs tests/d1-postgres.test.mjs tests/closeness-unlocks.test.mjs tests/couple-trips.test.mjs tests/gift-orders.test.mjs tests/payment-plans.test.mjs tests/ops-dashboard.test.mjs`: calendar export privacy, UTF-8 folding, annual leap-day anchors, media recognition, byte ranges, timezone conversion, DST gaps/overlaps, recurrence, custom offsets, snooze, countdown thresholds, D1-to-Postgres SQL rewrite (including quoted `AS "userId"` aliases), closeness unlock rules (100/50/25 notes, calendar, and push), trip split/date rules, gift catalog payment hooks, payment-plan split/gating helpers, and operations-dashboard gate/aggregation helpers.
 - `pnpm exec tsc --noEmit`: typed application and route checks.
-- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, partner block/report (unlink, rejected re-pair both ways, flagged report), and push/closeness/special-day reminders (subscribe/unsubscribe, note targeting, draft/send gating, calendar unlocks, scheduled notes, reminder timing, cron dedupe and auth, quiet block cleanup). Test identities are synthetic. Soft closeness decay after quiet days is intentionally left as follow-up work.
+- After `pnpm build` and `pnpm db:migrate`, `pnpm test:e2e`: sign-up/save plus two partners pairing (invite code), shared notes/memories/check-ins, a third user denied access, partner block/report (unlink, rejected re-pair both ways, flagged report), push/closeness/special-day reminders (subscribe/unsubscribe, note targeting, draft/send gating, calendar unlocks, scheduled notes, reminder timing, cron dedupe and auth, quiet block cleanup), trips, catalog gift orders, and payment-plan happy paths (demo Plus, 3-part split, partner contribution, paid gift). Test identities are synthetic. Soft closeness decay after quiet days is intentionally left as follow-up work.
 - Browser QA covers the dashboard, pin editor, custom date/reminder entry, navigation, responsive layouts and install guidance. The browser's optional WebMCP `modelContext` is unavailable in this environment; tools are feature-detected and registered with cleanup when supported.
 
 Two structured browser tools are included: `list_love_pins` (read only) and `start_love_pin` (opens the editor without saving). Inputs are validated and outputs use the same visible state as the interface.

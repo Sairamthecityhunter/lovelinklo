@@ -9,6 +9,7 @@ import type {LoveState,Product,Pin as WishPin} from '@/lib/love-types';
 import {Choice,EmptyState} from './lovelink';
 import './love-together.css';
 import {MarketplaceOrders} from './love-marketplace';
+import {GiftPaymentPlans} from './love-billing';
 import {sellerMoney} from '@/lib/seller';
 
 type GiftOrder = {
@@ -32,6 +33,7 @@ function GiftCatalogOrder({state}:{state:LoveState}) {
   const [orders,setOrders]=useState<GiftOrder[]>([]);
   const [created,setCreated]=useState<GiftOrder|null>(null);
   const [payment,setPayment]=useState<{mode:string;provider:string}|null>(null);
+  const [plus,setPlus]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
 
@@ -41,6 +43,8 @@ function GiftCatalogOrder({state}:{state:LoveState}) {
     if (!r.ok) throw new Error(data.error || 'Could not load gift orders.');
     setOrders(data.orders || []);
     if (data.payment) setPayment(data.payment);
+    const billing = await fetch('/api/billing', {cache: 'no-store'}).then((res) => res.ok ? res.json() : null).catch(() => null);
+    if (billing && typeof billing.plus === 'boolean') setPlus(billing.plus);
     const params = new URLSearchParams(window.location.search);
     const wanted = productId || params.get('place');
     if (wanted && !selected) setSelected(products.find((item) => item.id === wanted) || null);
@@ -63,6 +67,7 @@ function GiftCatalogOrder({state}:{state:LoveState}) {
           <p>{created.title} for {created.recipientName}. Status: {created.status.replaceAll('_',' ')}.</p>
           <p className="help-text">{created.checkoutUrl ? 'Continue to the payment provider when you are ready.' : 'No live payment keys are connected, so this stays pending_payment until Stripe is hooked up.'}</p>
           {created.checkoutUrl && <a className="primary-button" href={created.checkoutUrl}>Continue to checkout</a>}
+          <GiftPaymentPlans giftOrderId={created.id} plus={plus}/>
           <button className="outline-button" onClick={() => {setCreated(null); setSelected(null);}}>Order another gift</button>
         </section>
       )}
@@ -159,6 +164,7 @@ function GiftCatalogOrder({state}:{state:LoveState}) {
           ))}
         </section>
       )}
+      {!created && <GiftPaymentPlans plus={plus}/>}
     </>
   );
 }
@@ -169,7 +175,7 @@ function SellerCatalog({onPin}:{onPin:(p:Partial<WishPin>)=>void}){
 }
 export function GiftsView({state,category,setCategory,onProduct,onWishlist,onPin}:{state:LoveState;category:string;setCategory:(v:string)=>void;onProduct:(p:Product)=>void;onWishlist:(p:Product)=>Promise<unknown>;onPin:(p:Partial<WishPin>)=>void;onAI?:()=>void}){
  const [tab,setTab]=useState('ideas'),[q,setQ]=useState(''),[budget,setBudget]=useState('all');
- useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.has('order'))setTab('physical');else if(params.has('place'))setTab('order');},[]);
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.has('order'))setTab('physical');else if(params.has('place')||params.get('tab')==='order'||params.has('orderPlan'))setTab('order');},[]);
  const visible=products.filter(p=>(category==='All gifts'||p.category===category)&&`${p.title} ${p.subtitle} ${p.tags.join(' ')}`.toLowerCase().includes(q.toLowerCase())&&p.price<=(budget==='all'?Infinity:Number(budget)));
  return <div className="gift-center"><div className="page-heading"><div><p className="eyebrow">THOUGHTFUL STARTS WITH KNOWING THEM</p><h1>Gifts, made clear.</h1><p>Save an idea, send something digital, or plan a physical gift.</p></div><a className="outline-button" href="/together?tab=passport"><Heart size={16}/>Gift Passport</a></div>
  <Tabs value={tab} onValueChange={setTab}><TabsList className="together-tabs" aria-label="Gift categories">{[['ideas','Gift ideas'],['digital','Digital gifts'],['physical','Physical gifts'],['order','Order a gift']].map(([v,t])=><TabsTrigger key={v} value={v}>{t}</TabsTrigger>)}</TabsList></Tabs>
