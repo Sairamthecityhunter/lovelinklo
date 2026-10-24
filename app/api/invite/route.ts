@@ -123,6 +123,11 @@ export async function POST(request: Request) {
       claimed('UPDATE media SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
       claimed('UPDATE couple_notes SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
       claimed('UPDATE daily_answers SET couple_id = ? WHERE user_id = ?', [row.couple_id, ctx.userId]),
+      claimed('UPDATE together_passports SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
+      claimed('DELETE FROM together_plans WHERE owner_id = ?', [ctx.userId]),
+      claimed('UPDATE couple_trips SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
+      claimed('UPDATE gift_orders SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
+      claimed('UPDATE gift_payment_plans SET couple_id = ? WHERE owner_id = ?', [row.couple_id, ctx.userId]),
     ]);
     if (!results[0].meta.changes) throw new ApiError(409, 'This invitation has already been accepted or the couple space is full.');
     await defaultPartnerCloseness(ctx.userId, row.inviter_id);

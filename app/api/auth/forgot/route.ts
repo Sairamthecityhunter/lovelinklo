@@ -1,4 +1,6 @@
 import {z} from 'zod';
+import {canRevealDevResetLink} from '@/lib/account-lifecycle';
+import {localResetUrl} from '@/lib/account-actions';
 import {ensureAuthTables} from '@/lib/migrate-local';
 import {assertRateLimit,clientIp} from '@/lib/rate-limit';
 import {failure,guard,jsonBody,response} from '@/lib/server';
@@ -20,8 +22,12 @@ export async function POST(request: Request) {
     await assertRateLimit('auth:forgot:' + email, 5, 60 * 60 * 1000);
     await assertRateLimit('auth:forgot-ip:' + clientIp(request), 10, 60 * 60 * 1000);
     const reset = await requestPasswordReset(email);
-    if (reset) await sendPasswordResetEmail(reset.email, reset.token);
-    return response({ok: true});
+    let resetUrl: string | undefined;
+    if (reset) {
+      const sent = await sendPasswordResetEmail(reset.email, reset.token);
+      if (!sent && canRevealDevResetLink()) resetUrl = localResetUrl(reset.token);
+    }
+    return response({ok: true, ...(resetUrl ? {resetUrl} : {})});
   } catch (e) {
     return failure(e);
   }
