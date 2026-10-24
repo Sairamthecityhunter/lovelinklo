@@ -20,7 +20,7 @@ export function AuthForm({mode,nextPath='/'}:{mode:'login'|'register';nextPath?:
   setBusy(true);
   try{
    const body=mode==='register'?{name,email,password}:{email,password};
-   const r=await fetch(mode==='register'?'/api/auth/register':'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const r=await fetch(mode==='register'?'/api/auth/register':'/api/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
    const data:any=await r.json();
    if(!r.ok)throw new Error(data.error||'Something went wrong. Please try again.');
    router.replace(nextPath.startsWith('/')&&!nextPath.startsWith('//')?nextPath:'/');

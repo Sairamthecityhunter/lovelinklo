@@ -28,9 +28,9 @@ const confirmSchema = z.object({
 }).strict();
 const cancelSchema = z.object({op: z.literal('cancel'), planId: z.string().uuid()}).strict();
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     return response(await listGiftPlans(ctx));
   } catch (e) {
     return failure(e);
@@ -40,7 +40,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     await assertRateLimit('payment-plans:' + ctx.userId, 40, 60 * 60 * 1000);
     const body = await jsonBody(request, 2000);
     if (body.op === 'create') {

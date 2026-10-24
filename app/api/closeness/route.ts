@@ -11,9 +11,9 @@ const schema = z.object({
   level: z.number().int(),
 }).strict();
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const partner = await currentPartner(ctx);
     const level = partner ? await closenessToward(ctx.userId, partner.userId) : null;
     return response({partner: partner ? {name: partner.name} : null, level, unlocks: viewerUnlocks(level)});
@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const parsed = schema.parse(await jsonBody(request, 500));
     if (!isClosenessLevel(parsed.level)) throw new ApiError(400, 'Choose 100, 50, or 25.');
     const partner = await currentPartner(ctx);

@@ -3,7 +3,7 @@ import {cityAction} from '@/lib/world-city-server';
 import {ensureUser,db,guard,jsonBody,response,failure,ApiError} from '@/lib/server';
 import {joinWorld,sessionFor,closeSession,snapshot,tryMatch,syncSchema,buildBlock} from '@/lib/world-server';
 export const dynamic='force-dynamic';
-export async function POST(request:Request){try{guard(request);const ctx=await ensureUser(),body=await jsonBody(request,4000),database=db();if(body.op==='join')return response(await joinWorld(ctx,body));
+export async function POST(request:Request){try{guard(request);const ctx=await ensureUser(request),body=await jsonBody(request,4000),database=db();if(body.op==='join')return response(await joinWorld(ctx,body));
  const token=z.string().uuid().parse(body.session);let s=await sessionFor(ctx,token);
  if(typeof body.op==='string'&&body.op.startsWith('city-')){await cityAction(s,body);return response(await snapshot(await sessionFor(ctx,token)));}
  if(body.op==='leave'){await closeSession(s);return response({left:true});}

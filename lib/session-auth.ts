@@ -1,65 +1,54 @@
-import {env} from '@/lib/cf-env';
-import {cookies,headers} from 'next/headers';
-import type {ChatGPTUser} from '@/app/chatgpt-auth';
+import type {ChatGPTIdentity} from './chatgpt-identity';
+import {env} from './cf-env';
 import type {Profile} from './love-types';
+import {
+ AuthError,
+ SESSION_COOKIE,
+ SESSION_DAYS,
+ assertLoginAllowed,
+ bytesToHex,
+ clearLoginFailures,
+ clearSessionCookieHeader,
+ cookieValue,
+ hashPassword,
+ isValidEmail,
+ isValidPassword,
+ normalizeEmail,
+ recordLoginFailure,
+ sessionCookieHeader,
+ signOutRedirect,
+ verifyPassword,
+} from './session-auth-core';
 
-export class AuthError extends Error{constructor(public status:number,message:string){super(message);}}
-export const SESSION_COOKIE='__lovelink_session';
-const SESSION_DAYS=30;
-const PBKDF2_ITERATIONS=210000;
-const loginAttempts=new Map<string,{count:number;lockedUntil:number}>();
+export {
+ AuthError,
+ REGISTER_PATH,
+ SESSION_COOKIE,
+ SIGN_IN_PATH,
+ SIGN_OUT_ALIAS_PATH,
+ SIGN_OUT_PATH,
+ assertLoginAllowed,
+ clearLoginFailures,
+ clearSessionCookieHeader,
+ cookieValue,
+ emailSignInPath,
+ emailSignOutPath,
+ hashPassword,
+ isAuthPrefetch,
+ isValidEmail,
+ isValidPassword,
+ normalizeEmail,
+ recordLoginFailure,
+ safeAuthReturnPath,
+ sessionCookieHeader,
+ signOutRedirect,
+ verifyPassword,
+} from './session-auth-core';
 
 function authDb(){if(!env.DB)throw new AuthError(503,'Your saved space is temporarily unavailable. Please try again.');return env.DB;}
-function bytesToHex(bytes:Uint8Array){return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');}
-function hexToBytes(hex:string){const out=new Uint8Array(hex.length/2);for(let i=0;i<out.length;i++)out[i]=parseInt(hex.slice(i*2,i*2+2),16);return out;}
 function sessionSecret(){return process.env.AUTH_SECRET||process.env.SESSION_SECRET||'';}
 async function sha256Hex(value:string){return bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(sessionSecret()+value))));}
-function timingSafeEqual(a:string,b:string){if(a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;}
-
-export function normalizeEmail(email:string){return email.trim().toLowerCase();}
-export function isValidEmail(email:string){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&email.length<=254;}
-export function isValidPassword(password:string){return typeof password==='string'&&password.length>=8&&password.length<=128;}
-
-export async function hashPassword(password:string){
- const salt=crypto.getRandomValues(new Uint8Array(16));
- const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
- const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:PBKDF2_ITERATIONS},key,256);
- return `pbkdf2$${PBKDF2_ITERATIONS}$${bytesToHex(salt)}$${bytesToHex(new Uint8Array(bits))}`;
-}
-
-export async function verifyPassword(password:string,stored:string){
- const [algo,iterText,saltHex,hashHex]=stored.split('$');
- if(algo!=='pbkdf2'||!iterText||!saltHex||!hashHex)return false;
- const iterations=Number(iterText);if(!Number.isInteger(iterations)||iterations<100000)return false;
- const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
- const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:hexToBytes(saltHex),iterations},key,256);
- return timingSafeEqual(bytesToHex(new Uint8Array(bits)),hashHex);
-}
-
-export function assertLoginAllowed(email:string){
- const row=loginAttempts.get(email);if(!row)return;
- if(row.lockedUntil>Date.now())throw new AuthError(429,'Too many sign-in attempts. Please wait a few minutes and try again.');
- if(row.lockedUntil&&row.lockedUntil<=Date.now())loginAttempts.delete(email);
-}
-
-export function recordLoginFailure(email:string){
- const row=loginAttempts.get(email)||{count:0,lockedUntil:0};
- row.count+=1;
- if(row.count>=8){row.lockedUntil=Date.now()+15*60*1000;row.count=0;}
- loginAttempts.set(email,row);
-}
-
-export function clearLoginFailures(email:string){loginAttempts.delete(email);}
-
 function sessionExpiry(){return new Date(Date.now()+SESSION_DAYS*86400000).toISOString();}
-
-export function sessionCookieHeader(token:string,secure:boolean){
- return `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS*86400}${secure?'; Secure':''}`;
-}
-
-export function clearSessionCookieHeader(secure:boolean){
- return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure?'; Secure':''}`;
-}
 
 export async function createSession(userId:string){
  if((process.env.VERCEL || process.env.NODE_ENV==='production') && !sessionSecret()){
@@ -76,27 +65,39 @@ export async function destroySession(token:string|undefined|null){
  await authDb().prepare('DELETE FROM auth_sessions WHERE token_hash = ?').bind(await sha256Hex(token)).run();
 }
 
-function cookieValue(header:string|null,name:string){
- if(!header)return null;
- for(const part of header.split(';')){
-  const trimmed=part.trim();
-  if(trimmed.startsWith(name+'='))return decodeURIComponent(trimmed.slice(name.length+1));
+async function nextRequestCookies(){
+ const {cookies,headers}=await import('next/headers');
+ try{
+  const jar=await cookies();
+  return jar.get(SESSION_COOKIE)?.value||null;
+ }catch{
+  return cookieValue((await headers()).get('cookie'),SESSION_COOKIE);
  }
- return null;
 }
 
 export async function readSessionTokenFromRequest(request?:Request){
  if(request)return cookieValue(request.headers.get('cookie'),SESSION_COOKIE);
  try{
-  const jar=await cookies();
-  return jar.get(SESSION_COOKIE)?.value||null;
+  return await nextRequestCookies();
  }catch{
-  const requestHeaders=await headers();
-  return cookieValue(requestHeaders.get('cookie'),SESSION_COOKIE);
+  return null;
  }
 }
 
-export async function userFromSessionToken(token:string|null|undefined):Promise<ChatGPTUser|null>{
+export async function currentSessionUser(request?:Request){
+ return userFromSessionToken(await readSessionTokenFromRequest(request));
+}
+
+export async function signOutResponse(request:Request,fallback='/login'){
+ const redirect=signOutRedirect(request,fallback);
+ if(redirect.status!==204){
+  const token=await readSessionTokenFromRequest(request);
+  try{await destroySession(token);}catch{/* still clear the cookie so the browser is signed out */}
+ }
+ return new Response(null,{status:redirect.status,headers:redirect.headers});
+}
+
+export async function userFromSessionToken(token:string|null|undefined):Promise<ChatGPTIdentity|null>{
  if(!token||token.length<32||token.length>128||!env.DB)return null;
  const tokenHash=await sha256Hex(token);
  const row=await env.DB.prepare(`SELECT s.user_id AS userId, a.email AS email, u.profile_json AS profile

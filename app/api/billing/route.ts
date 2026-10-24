@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic';
 const startSchema = z.object({op: z.literal('start-plus')}).strict();
 const cancelSchema = z.object({op: z.literal('cancel-plus')}).strict();
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const [billing, partner] = await Promise.all([coupleBilling(ctx.coupleId), currentPartner(ctx)]);
     return response(billingPayload(billing, partner));
   } catch (e) {
@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     await assertRateLimit('billing:' + ctx.userId, 30, 60 * 60 * 1000);
     const body = await jsonBody(request, 1000);
     if (body.op === 'start-plus') {

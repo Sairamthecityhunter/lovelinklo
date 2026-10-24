@@ -1,7 +1,7 @@
 import {ApiError,db,storage,ensureUser,failure} from '@/lib/server';
 import {byteRange} from '@/lib/media';
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){try{
- const ctx=await ensureUser();const {id}=await params;
+ const ctx=await ensureUser(request);const {id}=await params;
  const row=await db().prepare('SELECT * FROM media WHERE id = ? AND couple_id = ?').bind(id,ctx.coupleId).first<{owner_id:string;object_key:string;mime:string;size:number}>();
  if(!row)throw new ApiError(404,'This media is private or unavailable.');
  if(row.owner_id!==ctx.userId){

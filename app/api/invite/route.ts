@@ -16,9 +16,9 @@ const acceptSchema = z.object({
   code: z.string().trim().max(20).optional(),
 }).strict();
 
-export async function GET() {
+export async function GET(request:Request) {
   try {
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const members = await db().prepare('SELECT COUNT(*) AS n FROM users WHERE couple_id = ?').bind(ctx.coupleId).first<{n: number}>();
     const pending = await db().prepare(
       'SELECT expires_at FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
@@ -36,7 +36,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     guard(request);
-    const ctx = await ensureUser();
+    const ctx = await ensureUser(request);
     const body = await jsonBody(request, 2000);
     const database = db();
     if (body.op === 'create') {
