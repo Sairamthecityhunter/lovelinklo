@@ -25,6 +25,20 @@ body .love-dialog{border-radius:24px!important;border:1px solid var(--border);bo
 @media(max-width:370px){.app-shell .main-content{padding:20px 15px 0}.topbar .top-actions{gap:3px}.home-shortcuts>button{padding:14px 12px}.couple-overview-copy h2{font-size:43px}.couple-clocks{padding-inline:19px;gap:10px}.couple-clocks>div:last-child{padding-left:12px}.priority-card{padding:21px}.home-gifts .product-image{height:160px}.app-shell .today-heading h1{font-size:34px}.connection-strip .text-button>svg{display:none}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
+.billing-card p,.billing-space-card p{font-size:14px;line-height:1.6;color:var(--muted-foreground);margin:8px 0 16px}
+.billing-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.billing-compare article{border:1px solid var(--border);border-radius:14px;padding:16px;background:var(--secondary)}
+.billing-compare h3{font-size:16px;margin:0 0 6px}
+.billing-compare strong{display:block;font-size:22px;margin-bottom:10px}
+.billing-compare small{font-size:13px;font-weight:500;color:var(--muted-foreground)}
+.billing-compare ul{margin:0;padding-left:18px;display:grid;gap:6px;font-size:13px;color:var(--foreground)}
+.billing-space-card,.billing-gift-panel{margin-bottom:22px;padding:22px}
+.billing-space-card h2{font-family:var(--font-display);font-size:28px;margin:4px 0 8px}
+.billing-plan{border-top:1px solid var(--border);padding-top:16px;margin-top:16px}
+.billing-progress{height:8px;border-radius:999px;background:var(--muted);overflow:hidden;margin:10px 0 14px}
+.billing-progress>span{display:block;height:100%;background:var(--primary)}
+.billing-home-link{margin-top:0}
+@media(max-width:767px){.billing-compare{grid-template-columns:1fr}}
 .couple-space-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:20px;margin-bottom:22px}
 .couple-hero-card h2{font-family:var(--font-display);font-size:42px;letter-spacing:-.03em;margin:8px 0}
 .couple-hero-card h2 small{font-size:22px;font-weight:500;color:var(--muted-foreground)}

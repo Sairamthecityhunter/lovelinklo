@@ -40,6 +40,7 @@ export async function unlinkFromPartner(ctx: {userId: string; coupleId: string})
     database.prepare('UPDATE couple_notes SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('UPDATE couple_trips SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('UPDATE gift_orders SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
+    database.prepare('UPDATE gift_payment_plans SET couple_id = ? WHERE owner_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('UPDATE daily_answers SET couple_id = ? WHERE user_id = ?').bind(nextCoupleId, ctx.userId),
     database.prepare('DELETE FROM partner_invitations WHERE couple_id = ? AND accepted_by IS NULL').bind(ctx.coupleId),
   ]);
